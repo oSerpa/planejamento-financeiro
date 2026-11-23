@@ -1,5 +1,4 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
-import { configurado } from './lib/supabase'
 import { AuthProvider, useAuth } from './data/auth'
 import { StoreProvider } from './data/store'
 import { Shell } from './components/Shell'
@@ -8,7 +7,6 @@ import { Lancamentos } from './pages/Lancamentos'
 import { Metas } from './pages/Metas'
 import { Ajustes } from './pages/Ajustes'
 import { Entrar } from './pages/Entrar'
-import { Configurar } from './pages/Configurar'
 
 function Rotas() {
   const { sessao, carregando } = useAuth()
@@ -32,7 +30,6 @@ function Rotas() {
 }
 
 export default function App() {
-  if (!configurado) return <Configurar />
   return (
     <AuthProvider>
       <Rotas />

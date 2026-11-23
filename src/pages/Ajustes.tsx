@@ -8,7 +8,7 @@ import { Icone, nomesIcones } from '../components/Icone'
 const cores = ['#3F7D58', '#6B8F3A', '#C2553A', '#D08A2E', '#C99A2E', '#4E6E8E', '#5A6BB0', '#8C5A9E', '#3E8E8A', '#9A6B4F']
 
 export function Ajustes() {
-  const { categorias, criarCategoria, removerCategoria } = useStore()
+  const { categorias, criarCategoria, removerCategoria, demo } = useStore()
   const { sessao, sair } = useAuth()
   const [tipo, setTipo] = useState<TipoLancamento>('saida')
   const [nome, setNome] = useState('')
@@ -124,15 +124,26 @@ export function Ajustes() {
         </form>
       </section>
 
-      <section className="cartao ajustes conta">
-        <div>
-          <span className="rotulo">Conta</span>
-          <p className="conta__email">{sessao?.user.email}</p>
-        </div>
-        <button className="btn btn--contorno" onClick={sair}>
-          <LogOut size={17} /> Sair
-        </button>
-      </section>
+      {demo ? (
+        <section className="cartao ajustes conta">
+          <div>
+            <span className="rotulo">Modo demonstração</span>
+            <p className="conta__email">
+              Os dados são de exemplo e somem ao recarregar. Para salvar de verdade, ligue o Supabase seguindo o README.
+            </p>
+          </div>
+        </section>
+      ) : (
+        <section className="cartao ajustes conta">
+          <div>
+            <span className="rotulo">Conta</span>
+            <p className="conta__email">{sessao?.user.email}</p>
+          </div>
+          <button className="btn btn--contorno" onClick={sair}>
+            <LogOut size={17} /> Sair
+          </button>
+        </section>
+      )}
     </div>
   )
 }

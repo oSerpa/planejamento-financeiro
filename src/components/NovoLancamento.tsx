@@ -10,16 +10,18 @@ interface Props {
   onFechar: () => void
   /** Quando vem preenchido, a tela edita esse lançamento. */
   lancamento?: Lancamento
+  /** Tipo já escolhido ao abrir pelos atalhos. */
+  tipoInicial?: TipoLancamento
 }
 
-export function NovoLancamento({ onFechar, lancamento }: Props) {
+export function NovoLancamento({ onFechar, lancamento, tipoInicial = 'saida' }: Props) {
   const { categorias, adicionar, atualizar, remover } = useStore()
   const editando = Boolean(lancamento)
-  const [tipo, setTipo] = useState<TipoLancamento>(lancamento?.tipo ?? 'saida')
+  const [tipo, setTipo] = useState<TipoLancamento>(lancamento?.tipo ?? tipoInicial)
   const [valor, setValor] = useState(lancamento ? valorParaCampo(lancamento.valor) : '')
   const [descricao, setDescricao] = useState(lancamento?.descricao ?? '')
   const [categoriaId, setCategoriaId] = useState(
-    lancamento?.categoriaId ?? categorias.find((c) => c.tipo === 'saida')?.id ?? '',
+    lancamento?.categoriaId ?? categorias.find((c) => c.tipo === (lancamento?.tipo ?? tipoInicial))?.id ?? '',
   )
   const [data, setData] = useState(lancamento?.data ?? hojeISO())
   const [salvando, setSalvando] = useState(false)

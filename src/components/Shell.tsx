@@ -36,17 +36,23 @@ export function Shell() {
         <Outlet />
       </main>
 
-      <nav className="abas" aria-label="Navegação">
-        {abas.map(({ to, label, icon: I }) => (
-          <NavLink key={to} to={to} end className="abas__link">
-            <I size={22} strokeWidth={1.75} />
+      <nav className="doca" aria-label="Navegação">
+        {abas.slice(0, 2).map(({ to, label, icon: I }) => (
+          <NavLink key={to} to={to} end className="doca__link">
+            <I size={21} strokeWidth={1.9} />
+            <span>{label === 'Lançamentos' ? 'Extrato' : label}</span>
+          </NavLink>
+        ))}
+        <button className="doca__mais" onClick={() => setAberto(true)} aria-label="Novo lançamento">
+          <Plus size={24} strokeWidth={2.5} />
+        </button>
+        {abas.slice(2).map(({ to, label, icon: I }) => (
+          <NavLink key={to} to={to} end className="doca__link">
+            <I size={21} strokeWidth={1.9} />
             <span>{label}</span>
           </NavLink>
         ))}
       </nav>
-      <button className="fab" onClick={() => setAberto(true)} aria-label="Novo lançamento">
-        <Plus size={26} strokeWidth={2.25} />
-      </button>
 
       {aberto && <NovoLancamento onFechar={() => setAberto(false)} />}
     </div>
