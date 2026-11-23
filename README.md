@@ -35,7 +35,8 @@ Se quiser pular a confirmação por e-mail enquanto testa, desligue **Confirm em
 
 - `src/styles/tokens.css`: paleta, raios, sombras, tema claro e escuro
 - `src/components`: Shell (navegação), Valor, Barra, ItemLancamento, NovoLancamento (cria e edita), SeletorMes
-- `src/pages`: Início, Lançamentos, Metas, Ajustes (categorias e sair), Entrar
+- `src/pages`: Chat (tela inicial), Início (resumo em /resumo), Lançamentos, Metas, Ajustes (categorias, palavras aprendidas e sair), Entrar
+- `src/lib/interpretar.ts`: lê frases do chat ("gastei 35 no ifood") por palavras-chave, sem IA paga e offline
 - `src/data/auth.tsx`: sessão do Supabase
 - `src/data/store.tsx`: leitura e escrita de lançamentos e categorias do mês
 - `supabase/schema.sql`: tabelas, RLS e categorias padrão

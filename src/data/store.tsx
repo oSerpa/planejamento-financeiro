@@ -49,7 +49,7 @@ interface Store {
   carregando: boolean
   erro: string | null
   categoria: (id: string) => Categoria | undefined
-  adicionar: (l: NovoLancamentoDados) => Promise<void>
+  adicionar: (l: NovoLancamentoDados) => Promise<Lancamento>
   atualizar: (id: string, l: NovoLancamentoDados) => Promise<void>
   remover: (id: string) => Promise<void>
   criarCategoria: (c: NovaCategoriaDados) => Promise<void>
@@ -118,6 +118,7 @@ function StoreSupabase({ children }: { children: ReactNode }) {
     checar(error)
     const novo = deLinha(data as LinhaLancamento)
     if (doMes(novo)) setLancamentos((a) => [novo, ...a])
+    return novo
   }
 
   const atualizar = async (id: string, dados: NovoLancamentoDados) => {
@@ -190,7 +191,11 @@ function StoreDemo({ children }: { children: ReactNode }) {
     carregando: false,
     erro: null,
     categoria: (id) => categorias.find((c) => c.id === id),
-    adicionar: async (l) => setTodos((a) => [{ ...l, id: novoId() }, ...a]),
+    adicionar: async (l) => {
+      const novo = { ...l, id: novoId() }
+      setTodos((a) => [novo, ...a])
+      return novo
+    },
     atualizar: async (id, l) => setTodos((a) => a.map((x) => (x.id === id ? { ...l, id } : x))),
     remover: async (id) => setTodos((a) => a.filter((x) => x.id !== id)),
     criarCategoria: async (c) => {

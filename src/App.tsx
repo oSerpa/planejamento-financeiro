@@ -3,6 +3,8 @@ import { AuthProvider, useAuth } from './data/auth'
 import { StoreProvider } from './data/store'
 import { Shell } from './components/Shell'
 import { Inicio } from './pages/Inicio'
+import { Chat } from './pages/Chat'
+import { ChatProvider } from './data/chat'
 import { Lancamentos } from './pages/Lancamentos'
 import { Metas } from './pages/Metas'
 import { Ajustes } from './pages/Ajustes'
@@ -15,16 +17,19 @@ function Rotas() {
   return (
     // key: trocar de conta zera os dados em memória
     <StoreProvider key={sessao.user.id}>
-      <BrowserRouter>
-        <Routes>
-          <Route element={<Shell />}>
-            <Route index element={<Inicio />} />
-            <Route path="lancamentos" element={<Lancamentos />} />
-            <Route path="metas" element={<Metas />} />
-            <Route path="ajustes" element={<Ajustes />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+      <ChatProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route element={<Shell />}>
+              <Route index element={<Chat />} />
+              <Route path="resumo" element={<Inicio />} />
+              <Route path="lancamentos" element={<Lancamentos />} />
+              <Route path="metas" element={<Metas />} />
+              <Route path="ajustes" element={<Ajustes />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </ChatProvider>
     </StoreProvider>
   )
 }

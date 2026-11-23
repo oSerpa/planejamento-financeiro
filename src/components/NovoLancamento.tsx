@@ -41,7 +41,7 @@ export function NovoLancamento({ onFechar, lancamento, tipoInicial = 'saida' }: 
     setCategoriaId(categorias.find((c) => c.tipo === t)?.id ?? '')
   }
 
-  async function executar(acao: () => Promise<void>) {
+  async function executar(acao: () => Promise<unknown>) {
     setSalvando(true)
     setErro(null)
     try {
