@@ -1,0 +1,50 @@
+/* Identidade visual: papel, tinta e verde-musgo. Nada de gradiente roxo. */
+:root {
+  --papel: #f3efe6;
+  --superficie: #fbf9f4;
+  --superficie-2: #ece6d9;
+  --tinta: #1c2a24;
+  --tinta-2: #56625b;
+  --tinta-3: #8a928c;
+  --linha: #e0d9ca;
+
+  --marca: #24493a;
+  --marca-tinta: #f3efe6;
+  --marca-suave: #dbe5dc;
+
+  --entrada: #3f7d58;
+  --saida: #c2553a;
+  --ouro: #c99a2e;
+
+  --raio: 18px;
+  --raio-p: 12px;
+  --sombra: 0 1px 0 rgba(28, 42, 36, 0.04), 0 8px 24px -12px rgba(28, 42, 36, 0.18);
+
+  --fonte-titulo: 'Fraunces Variable', Georgia, serif;
+  --fonte-texto: 'Instrument Sans Variable', system-ui, sans-serif;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --papel: #121815;
+    --superficie: #1a221e;
+    --superficie-2: #232d28;
+    --tinta: #ece7dc;
+    --tinta-2: #a9b0aa;
+    --tinta-3: #77807a;
+    --linha: #2b3631;
+
+    --marca: #2f5d4a;
+    --marca-tinta: #f3efe6;
+    --marca-suave: #22362d;
+
+    --entrada: #6fbf8c;
+    --saida: #e8826a;
+    --ouro: #e0b54f;
+
+    --sombra: 0 1px 0 rgba(0, 0, 0, 0.2), 0 10px 28px -14px rgba(0, 0, 0, 0.6);
+    color-scheme: dark;
+  }
+}
