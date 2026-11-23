@@ -1,0 +1,9 @@
+import { createClient } from '@supabase/supabase-js'
+
+const url = import.meta.env.VITE_SUPABASE_URL
+const chave = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
+
+export const configurado = Boolean(url && chave)
+
+/** null quando o .env.local ainda não foi preenchido. */
+export const supabase = configurado ? createClient(url!, chave!) : null

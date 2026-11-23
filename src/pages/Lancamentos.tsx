@@ -1,16 +1,19 @@
 import { useState } from 'react'
-import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
-import { hoje } from '../data/mock'
+import { Search } from 'lucide-react'
 import { useStore } from '../data/store'
-import type { TipoLancamento } from '../data/types'
-import { diaRelativo, nomeMes } from '../lib/format'
+import type { Lancamento, TipoLancamento } from '../data/types'
+import { diaRelativo, hojeISO } from '../lib/format'
 import { ItemLancamento } from '../components/ItemLancamento'
 import { Valor } from '../components/Valor'
+import { NovoLancamento } from '../components/NovoLancamento'
+import { SeletorMes } from '../components/SeletorMes'
 
 type Filtro = 'todos' | TipoLancamento
 
 export function Lancamentos() {
-  const { lancamentos } = useStore()
+  const { lancamentos, carregando, erro } = useStore()
+  const [aberto, setAberto] = useState<Lancamento | null>(null)
+  const hoje = hojeISO()
   const [filtro, setFiltro] = useState<Filtro>('todos')
   const [busca, setBusca] = useState('')
 
@@ -33,16 +36,10 @@ export function Lancamentos() {
     <div className="pagina">
       <header className="cabecalho cabecalho--linha">
         <h1 className="cabecalho__titulo">Lançamentos</h1>
-        <div className="mes">
-          <button className="btn-icone" aria-label="Mês anterior">
-            <ChevronLeft size={18} />
-          </button>
-          <span className="mes__nome">{nomeMes(hoje)}</span>
-          <button className="btn-icone" aria-label="Próximo mês">
-            <ChevronRight size={18} />
-          </button>
-        </div>
+        <SeletorMes />
       </header>
+
+      {erro && <p className="alerta alerta--erro">Não deu para carregar: {erro}</p>}
 
       <div className="resumo-linha">
         <div className="resumo-linha__item">
@@ -73,7 +70,15 @@ export function Lancamentos() {
         </label>
       </div>
 
-      {porDia.length === 0 && <p className="vazio">Nada por aqui com esse filtro.</p>}
+      {porDia.length === 0 && (
+        <p className="vazio">
+          {carregando
+            ? 'Carregando…'
+            : lancamentos.length === 0
+              ? 'Nenhum lançamento neste mês. Use o botão + para criar o primeiro.'
+              : 'Nada por aqui com esse filtro.'}
+        </p>
+      )}
 
       {porDia.map(([dia, itens]) => {
         const saldoDia = itens.reduce((s, l) => s + (l.tipo === 'entrada' ? l.valor : -l.valor), 0)
@@ -85,12 +90,14 @@ export function Lancamentos() {
             </div>
             <ul className="lista cartao">
               {itens.map((l) => (
-                <ItemLancamento key={l.id} l={l} />
+                <ItemLancamento key={l.id} l={l} onAbrir={setAberto} />
               ))}
             </ul>
           </section>
         )
       })}
+
+      {aberto && <NovoLancamento lancamento={aberto} onFechar={() => setAberto(null)} />}
     </div>
   )
 }

@@ -18,6 +18,10 @@ export interface Lancamento {
   conta?: string
 }
 
+export type NovoLancamentoDados = Omit<Lancamento, 'id'>
+export type NovaCategoriaDados = Omit<Categoria, 'id'>
+
+/** Metas continuam mockadas até o passo 3. */
 export interface Meta {
   id: string
   nome: string

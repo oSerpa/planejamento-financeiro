@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { Flag, House, Plus, ReceiptText } from 'lucide-react'
+import { Flag, House, Plus, ReceiptText, Settings } from 'lucide-react'
 import { useState } from 'react'
 import { NovoLancamento } from './NovoLancamento'
 
@@ -7,6 +7,7 @@ const abas = [
   { to: '/', label: 'Início', icon: House },
   { to: '/lancamentos', label: 'Lançamentos', icon: ReceiptText },
   { to: '/metas', label: 'Metas', icon: Flag },
+  { to: '/ajustes', label: 'Ajustes', icon: Settings },
 ]
 
 export function Shell() {
