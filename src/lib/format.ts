@@ -54,3 +54,10 @@ export function lerValor(texto: string) {
 
 /** 12.5 vira "12,50" para preencher o campo de valor. */
 export const valorParaCampo = (v: number) => v.toFixed(2).replace('.', ',')
+
+/** Soma dias a um "yyyy-mm-dd". */
+export function isoDeslocado(iso: string, dias: number) {
+  const d = parseISO(iso)
+  d.setDate(d.getDate() + dias)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}

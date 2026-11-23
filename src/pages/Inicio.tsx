@@ -12,6 +12,7 @@ import { SeletorMes } from '../components/SeletorMes'
 import { Icone } from '../components/Icone'
 import { useContagem } from '../lib/useContagem'
 import { Vazio } from '../components/Vazio'
+import { FichaLancamento } from '../components/DetalheLancamento'
 
 function saudacao() {
   const h = new Date().getHours()
@@ -253,7 +254,7 @@ export function Inicio() {
         </section>
       </div>
 
-      {aberto && <NovoLancamento lancamento={aberto} onFechar={() => setAberto(null)} />}
+      {aberto && <FichaLancamento l={aberto} onFechar={() => setAberto(null)} />}
       {novo && <NovoLancamento tipoInicial={novo} onFechar={() => setNovo(null)} />}
     </div>
   )

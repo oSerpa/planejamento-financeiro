@@ -1,8 +1,9 @@
-import { CheckCircle2, Plus } from 'lucide-react'
+import { ArrowDownToLine, ArrowUpFromLine, CheckCircle2, Plus, Trophy } from 'lucide-react'
 import { useStore } from '../data/store'
 import { dinheiro, hojeISO, mesesAte, parseISO } from '../lib/format'
 import { Icone } from '../components/Icone'
 import { Valor } from '../components/Valor'
+import { Cabecalho } from '../components/Cabecalho'
 
 function Anel({ pct, cor }: { pct: number; cor: string }) {
   const r = 26
@@ -31,29 +32,44 @@ export function Metas() {
   const guardado = metas.reduce((s, m) => s + m.guardado, 0)
   const alvo = metas.reduce((s, m) => s + m.alvo, 0)
 
+  const pctGeral = alvo ? (guardado / alvo) * 100 : 0
+  const batidas = metas.filter((m) => m.guardado >= m.alvo).length
+
   return (
-    <div className="pagina">
-      <header className="cabecalho cabecalho--linha">
-        <div>
-          <p className="cabecalho__sup">Guardado no total</p>
-          <h1 className="cabecalho__titulo">
-            <Valor valor={guardado} />
-          </h1>
-          <p className="cabecalho__sub">de {dinheiro(alvo)} somando todas as metas</p>
-        </div>
-        <button className="btn btn--contorno">
-          <Plus size={18} /> Nova meta
+    <div className="pagina pagina--v2">
+      <Cabecalho sup="Metas" titulo="Seu dinheiro guardado">
+        <button className="btn btn--suave btn--pequeno">
+          <Plus size={17} /> Nova meta
         </button>
-      </header>
+      </Cabecalho>
+
+      <section className="hero hero--metas entra">
+        <div className="hero__linha">
+          <span className="hero__rotulo">Guardado no total</span>
+          <span className="hero__pilula">
+            <Trophy size={13} /> {batidas} de {metas.length} batidas
+          </span>
+        </div>
+        <Valor valor={guardado} className="hero__valor" />
+        <p className="hero__dica">
+          <strong>{Math.round(pctGeral)}%</strong> de {dinheiro(alvo)} somando todas as metas.
+        </p>
+        <div className="hero__barra" aria-label="Quanto cada meta já tem">
+          {metas.map((m) => (
+            <span key={m.id} style={{ flexGrow: m.guardado, background: m.cor }} title={m.nome} />
+          ))}
+          {alvo > guardado && <span className="hero__barra-sobra" style={{ flexGrow: alvo - guardado }} title="Falta" />}
+        </div>
+      </section>
 
       <div className="metas">
-        {metas.map((m) => {
+        {metas.map((m, i) => {
           const pct = (m.guardado / m.alvo) * 100
           const falta = Math.max(0, m.alvo - m.guardado)
           const meses = mesesAte(m.prazo, hojeISO())
           const concluida = falta === 0
           return (
-            <article key={m.id} className={`cartao meta ${concluida ? 'meta--ok' : ''}`}>
+            <article key={m.id} className={`painel meta entra ${concluida ? 'meta--ok' : ''}`} style={{ '--i': i + 1 } as React.CSSProperties}>
               <div className="meta__topo">
                 <span className="meta__icone" style={{ color: m.cor, background: `${m.cor}1f` }}>
                   <Icone nome={m.icone} size={20} />
@@ -91,8 +107,12 @@ export function Metas() {
 
               {!concluida && (
                 <div className="meta__acoes">
-                  <button className="btn btn--suave">Guardar</button>
-                  <button className="btn btn--fantasma">Retirar</button>
+                  <button className="btn btn--primario">
+                    <ArrowDownToLine size={16} /> Guardar
+                  </button>
+                  <button className="btn btn--contorno-suave">
+                    <ArrowUpFromLine size={16} /> Retirar
+                  </button>
                 </div>
               )}
             </article>

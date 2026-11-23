@@ -4,6 +4,7 @@ import { useAuth } from '../data/auth'
 import { useStore } from '../data/store'
 import type { TipoLancamento } from '../data/types'
 import { Icone, nomesIcones } from '../components/Icone'
+import { Cabecalho } from '../components/Cabecalho'
 
 const cores = ['#3F7D58', '#6B8F3A', '#C2553A', '#D08A2E', '#C99A2E', '#4E6E8E', '#5A6BB0', '#8C5A9E', '#3E8E8A', '#9A6B4F']
 
@@ -40,16 +41,16 @@ export function Ajustes() {
   const lista = categorias.filter((c) => c.tipo === tipo)
 
   return (
-    <div className="pagina">
-      <header className="cabecalho">
-        <h1 className="cabecalho__titulo">Ajustes</h1>
-      </header>
+    <div className="pagina pagina--v2">
+      <Cabecalho sup="Ajustes" titulo="Categorias e conta" />
 
-      <section className="cartao ajustes">
-        <div className="secao-topo">
-          <h2 className="secao-titulo">Categorias</h2>
+      <section className="painel ajustes entra">
+        <div className="painel__topo">
+          <h2 className="painel__titulo">Categorias</h2>
+          <span className="painel__extra">{lista.length} de {tipo === 'saida' ? 'saída' : 'entrada'}</span>
         </div>
-        <div className="segmento" data-tipo={tipo}>
+        <div className="segmento segmento--deslizante" data-tipo={tipo}>
+          <span className="segmento__marca" aria-hidden />
           <button type="button" className={tipo === 'saida' ? 'ativo' : ''} onClick={() => setTipo('saida')}>
             Saídas
           </button>
@@ -58,7 +59,7 @@ export function Ajustes() {
           </button>
         </div>
 
-        <ul className="lista">
+        <ul className="lista cats-ajuste">
           {lista.map((c) => (
             <li key={c.id} className="item">
               <span className="item__icone" style={{ color: c.cor, background: `${c.cor}1f` }}>
@@ -81,8 +82,14 @@ export function Ajustes() {
         </ul>
 
         <form className="nova-cat" onSubmit={criar}>
+          <p className="nova-cat__titulo">
+            <span className="nova-cat__previa" style={{ color: cor, background: `${cor}1f` }}>
+              <Icone nome={icone} size={18} />
+            </span>
+            {nome.trim() || 'Nova categoria'}
+          </p>
           <label className="campo">
-            <span className="campo__rotulo">Nova categoria de {tipo === 'saida' ? 'saída' : 'entrada'}</span>
+            <span className="campo__rotulo">Nome da categoria de {tipo === 'saida' ? 'saída' : 'entrada'}</span>
             <input value={nome} maxLength={40} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: Pets" />
           </label>
           <div className="campo">
@@ -125,7 +132,7 @@ export function Ajustes() {
       </section>
 
       {demo ? (
-        <section className="cartao ajustes conta">
+        <section className="painel ajustes conta entra" style={{ '--i': 1 } as React.CSSProperties}>
           <div>
             <span className="rotulo">Modo demonstração</span>
             <p className="conta__email">
@@ -134,7 +141,7 @@ export function Ajustes() {
           </div>
         </section>
       ) : (
-        <section className="cartao ajustes conta">
+        <section className="painel ajustes conta entra" style={{ '--i': 1 } as React.CSSProperties}>
           <div>
             <span className="rotulo">Conta</span>
             <p className="conta__email">{sessao?.user.email}</p>
