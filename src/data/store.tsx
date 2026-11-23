@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { supabase } from '../lib/supabase'
 import { hojeISO, mesDe, somarMes } from '../lib/format'
 import { metas as metasMock } from './mock'
+import { categoriasDemo, lancamentosDemo } from './demo'
 import type { Categoria, Lancamento, Meta, NovaCategoriaDados, NovoLancamentoDados } from './types'
 
 interface LinhaLancamento {
@@ -37,6 +38,8 @@ const COLUNAS_L = 'id, descricao, valor, tipo, categoria_id, data, conta'
 const COLUNAS_C = 'id, nome, tipo, cor, icone'
 
 interface Store {
+  /** true quando roda sem Supabase, só com dados de exemplo em memória. */
+  demo: boolean
   /** Mês que está sendo visto, "yyyy-mm". */
   mes: string
   irParaMes: (n: number) => void
@@ -64,6 +67,10 @@ function checar(error: { message: string; code?: string } | null) {
 }
 
 export function StoreProvider({ children }: { children: ReactNode }) {
+  return supabase ? <StoreSupabase>{children}</StoreSupabase> : <StoreDemo>{children}</StoreDemo>
+}
+
+function StoreSupabase({ children }: { children: ReactNode }) {
   const [mes, setMes] = useState(() => mesDe(hojeISO()))
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([])
@@ -147,6 +154,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }
 
   const valor: Store = {
+    demo: false,
     mes,
     irParaMes: (n) => setMes((m) => somarMes(m, n)),
     categorias,
@@ -162,6 +170,38 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     removerCategoria,
   }
 
+  return <Ctx.Provider value={valor}>{children}</Ctx.Provider>
+}
+
+/** Sem .env: tudo em memória, some ao recarregar a página. */
+function StoreDemo({ children }: { children: ReactNode }) {
+  const [mes, setMes] = useState(() => mesDe(hojeISO()))
+  const [categorias, setCategorias] = useState<Categoria[]>(categoriasDemo)
+  const [todos, setTodos] = useState<Lancamento[]>(lancamentosDemo)
+  const novoId = () => `d-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+
+  const valor: Store = {
+    demo: true,
+    mes,
+    irParaMes: (n) => setMes((m) => somarMes(m, n)),
+    categorias,
+    lancamentos: todos.filter((l) => mesDe(l.data) === mes).sort((a, b) => b.data.localeCompare(a.data)),
+    metas: metasMock,
+    carregando: false,
+    erro: null,
+    categoria: (id) => categorias.find((c) => c.id === id),
+    adicionar: async (l) => setTodos((a) => [{ ...l, id: novoId() }, ...a]),
+    atualizar: async (id, l) => setTodos((a) => a.map((x) => (x.id === id ? { ...l, id } : x))),
+    remover: async (id) => setTodos((a) => a.filter((x) => x.id !== id)),
+    criarCategoria: async (c) => {
+      if (categorias.some((x) => x.tipo === c.tipo && x.nome === c.nome)) throw new Error('Já existe uma categoria com esse nome.')
+      setCategorias((a) => [...a, { ...c, id: novoId() }].sort((x, y) => x.nome.localeCompare(y.nome)))
+    },
+    removerCategoria: async (id) => {
+      if (todos.some((l) => l.categoriaId === id)) throw new Error('Essa categoria tem lançamentos. Mude eles de categoria antes de apagar.')
+      setCategorias((a) => a.filter((c) => c.id !== id))
+    },
+  }
   return <Ctx.Provider value={valor}>{children}</Ctx.Provider>
 }
 

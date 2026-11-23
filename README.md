@@ -11,8 +11,12 @@ npm run dev
 
 ## Stack
 
-React 19, Vite, TypeScript, React Router. Fontes Fraunces (títulos e valores) e Instrument Sans (texto).
+React 19, Vite, TypeScript, React Router. Fontes Bricolage Grotesque (títulos e valores) e Instrument Sans (texto).
 Login e dados (lançamentos e categorias) ficam no Supabase. Metas ainda são mockadas em `src/data/mock.ts` (passo 3).
+
+## Modo demonstração
+
+Sem o `.env.local`, o app abre direto com dados de exemplo em memória (três meses de lançamentos). Dá para criar, editar e apagar, mas tudo some ao recarregar.
 
 ## Ligar o Supabase
 

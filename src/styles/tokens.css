@@ -1,8 +1,8 @@
 /* Identidade visual: papel, tinta e verde-musgo. Nada de gradiente roxo. */
 :root {
-  --papel: #f3efe6;
-  --superficie: #fbf9f4;
-  --superficie-2: #ece6d9;
+  --papel: #f1eee6;
+  --superficie: #fcfbf7;
+  --superficie-2: #e9e5da;
   --tinta: #1c2a24;
   --tinta-2: #56625b;
   --tinta-3: #8a928c;
@@ -15,12 +15,15 @@
   --entrada: #3f7d58;
   --saida: #c2553a;
   --ouro: #c99a2e;
+  --hero: #1d3b2f;
+  --hero-2: #2a5442;
+  --lima: #d7e58c;
 
   --raio: 18px;
   --raio-p: 12px;
   --sombra: 0 1px 0 rgba(28, 42, 36, 0.04), 0 8px 24px -12px rgba(28, 42, 36, 0.18);
 
-  --fonte-titulo: 'Fraunces Variable', Georgia, serif;
+  --fonte-titulo: 'Bricolage Grotesque Variable', 'Instrument Sans Variable', system-ui, sans-serif;
   --fonte-texto: 'Instrument Sans Variable', system-ui, sans-serif;
 
   color-scheme: light;
@@ -43,6 +46,9 @@
     --entrada: #6fbf8c;
     --saida: #e8826a;
     --ouro: #e0b54f;
+    --hero: #1f3a2e;
+    --hero-2: #2c5443;
+    --lima: #cfe07a;
 
     --sombra: 0 1px 0 rgba(0, 0, 0, 0.2), 0 10px 28px -14px rgba(0, 0, 0, 0.6);
     color-scheme: dark;

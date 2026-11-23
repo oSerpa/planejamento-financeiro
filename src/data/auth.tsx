@@ -9,11 +9,14 @@ interface Auth {
   sair: () => Promise<void>
 }
 
+const sessaoDemo = { user: { id: 'demo', user_metadata: {} } } as unknown as Session
+
 const Ctx = createContext<Auth | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [sessao, setSessao] = useState<Session | null>(null)
-  const [carregando, setCarregando] = useState(true)
+  // sem Supabase entra direto numa sessão de demonstração
+  const [sessao, setSessao] = useState<Session | null>(supabase ? null : sessaoDemo)
+  const [carregando, setCarregando] = useState(Boolean(supabase))
 
   useEffect(() => {
     if (!supabase) return
