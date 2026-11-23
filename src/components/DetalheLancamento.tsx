@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { CalendarDays, CreditCard, Pencil, Tag, Trash2, X } from 'lucide-react'
+import { CalendarDays, CreditCard, Layers, Pencil, Repeat, Tag, Trash2, X } from 'lucide-react'
 import { useStore } from '../data/store'
 import type { Lancamento } from '../data/types'
-import { parseISO } from '../lib/format'
+import { nomeMes, parseISO } from '../lib/format'
 import { Icone } from './Icone'
 import { Valor } from './Valor'
 import { NovoLancamento } from './NovoLancamento'
@@ -17,10 +17,13 @@ interface Props {
 
 /** Ficha do lançamento: abre ao tocar num item, com atalho para editar ou apagar. */
 export function DetalheLancamento({ l, onFechar, onEditar }: Props) {
-  const { categoria, lancamentos, remover } = useStore()
+  const { categoria, cartao, lancamentos, remover, removerGrupo, recorrencias } = useStore()
   const [confirmar, setConfirmar] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const cat = categoria(l.categoriaId) ?? semCategoria
+  const k = cartao(l.cartaoId)
+  const rec = recorrencias.find((r) => r.id === l.recorrenciaId)
+  const [confirmarTodas, setConfirmarTodas] = useState(false)
 
   const mesmaCat = lancamentos.filter((x) => x.categoriaId === l.categoriaId)
   const totalCat = mesmaCat.reduce((s, x) => s + x.valor, 0)
@@ -67,7 +70,35 @@ export function DetalheLancamento({ l, onFechar, onEditar }: Props) {
             </dt>
             <dd className="detalhe__data">{data}</dd>
           </div>
-          {l.conta && (
+          {k && (
+            <div>
+              <dt>
+                <CreditCard size={15} /> Cartão
+              </dt>
+              <dd>
+                {k.nome}, fatura de {l.fatura && nomeMes(`${l.fatura}-01`).split(' de ')[0]}
+              </dd>
+            </div>
+          )}
+          {l.parcelas && (
+            <div>
+              <dt>
+                <Layers size={15} /> Parcela
+              </dt>
+              <dd>
+                {l.parcela} de {l.parcelas}
+              </dd>
+            </div>
+          )}
+          {l.recorrenciaId && (
+            <div>
+              <dt>
+                <Repeat size={15} /> Repete
+              </dt>
+              <dd>{rec ? `todo mês, dia ${rec.dia}` : 'todo mês'}</dd>
+            </div>
+          )}
+          {l.conta && !k && (
             <div>
               <dt>
                 <CreditCard size={15} /> Conta
@@ -98,9 +129,26 @@ export function DetalheLancamento({ l, onFechar, onEditar }: Props) {
             <Pencil size={17} /> Editar
           </button>
           <button type="button" className={`btn ${confirmar ? 'btn--perigo-cheio' : 'btn--fantasma btn--perigo'}`} onClick={apagar}>
-            <Trash2 size={17} /> {confirmar ? 'Confirmar' : 'Apagar'}
+            <Trash2 size={17} /> {confirmar ? 'Confirmar' : l.grupo ? 'Apagar esta' : 'Apagar'}
           </button>
         </div>
+        {l.grupo && (
+          <button
+            type="button"
+            className={`btn btn--largo ${confirmarTodas ? 'btn--perigo-cheio' : 'btn--fantasma btn--perigo'}`}
+            onClick={async () => {
+              if (!confirmarTodas) return setConfirmarTodas(true)
+              try {
+                await removerGrupo(l.grupo!)
+                onFechar()
+              } catch (e) {
+                setErro(e instanceof Error ? e.message : 'Não deu para apagar.')
+              }
+            }}
+          >
+            <Layers size={17} /> {confirmarTodas ? `Confirmar: apagar as ${l.parcelas} parcelas` : `Apagar as ${l.parcelas} parcelas`}
+          </button>
+        )}
       </div>
     </div>
   )

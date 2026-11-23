@@ -1,16 +1,20 @@
 import { useState, type FormEvent } from 'react'
-import { LogOut, Plus, Trash2, X } from 'lucide-react'
+import { LogOut, Plus, Repeat, Trash2, X } from 'lucide-react'
 import { useChat } from '../data/chat'
 import { useAuth } from '../data/auth'
 import { useStore } from '../data/store'
 import type { TipoLancamento } from '../data/types'
 import { Icone, nomesIcones } from '../components/Icone'
 import { Cabecalho } from '../components/Cabecalho'
+import { Valor } from '../components/Valor'
+import { proximaData } from '../lib/financas'
+import { hojeISO, parseISO } from '../lib/format'
 
 const cores = ['#3F7D58', '#6B8F3A', '#C2553A', '#D08A2E', '#C99A2E', '#4E6E8E', '#5A6BB0', '#8C5A9E', '#3E8E8A', '#9A6B4F']
 
 export function Ajustes() {
-  const { categorias, criarCategoria, removerCategoria, demo } = useStore()
+  const { categorias, criarCategoria, removerCategoria, demo, recorrencias, pararRecorrencia, cartao } = useStore()
+  const [parando, setParando] = useState<string | null>(null)
   const { sessao, sair } = useAuth()
   const { aprendidas, esquecer } = useChat()
   const palavras = Object.entries(aprendidas).sort(([a], [b]) => a.localeCompare(b))
@@ -136,6 +140,51 @@ export function Ajustes() {
 
       <section className="painel ajustes entra" style={{ '--i': 1 } as React.CSSProperties}>
         <div className="painel__topo">
+          <h2 className="painel__titulo">Recorrentes</h2>
+          <span className="painel__extra">{recorrencias.length}</span>
+        </div>
+        {recorrencias.length === 0 ? (
+          <p className="conta__email">
+            Contas fixas e assinaturas que lançam sozinhas todo mês. Crie pelo chat ("netflix 55 todo mês") ou marcando "Todo mês" no novo lançamento.
+          </p>
+        ) : (
+          <ul className="lista cats-ajuste">
+            {recorrencias.map((r) => {
+              const c = categorias.find((x) => x.id === r.categoriaId)
+              const prox = parseISO(proximaData(r, hojeISO())).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' }).replace('.', '')
+              const k = cartao(r.cartaoId)
+              return (
+                <li key={r.id} className="item">
+                  <span className="item__icone" style={{ color: c?.cor, background: `${c?.cor ?? '#8A928C'}1f` }}>
+                    {c ? <Icone nome={c.icone} size={18} /> : <Repeat size={18} />}
+                  </span>
+                  <span className="item__texto">
+                    <span className="item__desc">{r.descricao}</span>
+                    <span className="item__meta">
+                      todo dia {r.dia} · próximo {prox}
+                      {k && <> · {k.nome}</>}
+                    </span>
+                  </span>
+                  <Valor valor={r.valor} sinal={r.tipo} className="item__valor" />
+                  <button
+                    className={`btn-icone ${parando === r.id ? 'btn-icone--perigo' : ''}`}
+                    aria-label={parando === r.id ? `Confirmar parar ${r.descricao}` : `Parar ${r.descricao}`}
+                    title={parando === r.id ? 'Toque de novo para parar' : 'Parar de lançar'}
+                    disabled={ocupado}
+                    onClick={() => (parando === r.id ? tentar(() => pararRecorrencia(r.id)).then(() => setParando(null)) : setParando(r.id))}
+                  >
+                    {parando === r.id ? <Trash2 size={17} /> : <X size={17} />}
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+        {recorrencias.length > 0 && <p className="campo__ajuda">Parar não apaga o que já foi lançado.</p>}
+      </section>
+
+      <section className="painel ajustes entra" style={{ '--i': 2 } as React.CSSProperties}>
+        <div className="painel__topo">
           <h2 className="painel__titulo">Palavras que o chat aprendeu</h2>
           <span className="painel__extra">{palavras.length}</span>
         </div>
@@ -164,7 +213,7 @@ export function Ajustes() {
       </section>
 
       {demo ? (
-        <section className="painel ajustes conta entra" style={{ '--i': 2 } as React.CSSProperties}>
+        <section className="painel ajustes conta entra" style={{ '--i': 3 } as React.CSSProperties}>
           <div>
             <span className="rotulo">Modo demonstração</span>
             <p className="conta__email">
@@ -173,7 +222,7 @@ export function Ajustes() {
           </div>
         </section>
       ) : (
-        <section className="painel ajustes conta entra" style={{ '--i': 2 } as React.CSSProperties}>
+        <section className="painel ajustes conta entra" style={{ '--i': 3 } as React.CSSProperties}>
           <div>
             <span className="rotulo">Conta</span>
             <p className="conta__email">{sessao?.user.email}</p>

@@ -1,41 +1,49 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { supabase } from '../lib/supabase'
 import { hojeISO, mesDe, somarMes } from '../lib/format'
+import { comFatura, gerarPendentes, montar } from '../lib/financas'
 import { metas as metasMock } from './mock'
-import { categoriasDemo, lancamentosDemo } from './demo'
-import type { Categoria, Lancamento, Meta, NovaCategoriaDados, NovoLancamentoDados } from './types'
+import { criarBackendDemo } from './demo'
+import { criarBackendSupabase } from './backend'
+import type {
+  Cartao, Categoria, Lancado, Lancamento, Meta, NovaCategoriaDados, NovoCartaoDados, NovoLancamentoDados, Recorrencia, Repeticao,
+} from './types'
 
-interface LinhaLancamento {
-  id: string
-  descricao: string
-  valor: number | string
-  tipo: Lancamento['tipo']
-  categoria_id: string
-  data: string
-  conta: string | null
+/**
+ * O que o app precisa do banco. Tem duas versões: Supabase (backend.ts) e memória (demo.ts).
+ * A Store em cima disso é a mesma para as duas.
+ */
+export interface Backend {
+  categorias(): Promise<Categoria[]>
+  criarCategoria(c: NovaCategoriaDados): Promise<Categoria>
+  removerCategoria(id: string): Promise<void>
+  definirLimite(id: string, limite: number | null): Promise<void>
+
+  /** Lançamentos com data entre inicio (inclusive) e fim (exclusive). */
+  lancamentosEntre(inicio: string, fim: string): Promise<Lancamento[]>
+  /** Lançamentos de cartão com fatura a partir desse mês. */
+  lancamentosDeCartao(desdeFatura: string): Promise<Lancamento[]>
+  inserir(ls: NovoLancamentoDados[]): Promise<Lancamento[]>
+  atualizar(id: string, l: NovoLancamentoDados): Promise<Lancamento>
+  /** Muda só a categoria (e o tipo) de vários de uma vez. */
+  recategorizar(ids: string[], categoriaId: string, tipo: Lancamento['tipo']): Promise<void>
+  remover(ids: string[]): Promise<void>
+  /** Apaga todas as parcelas de uma compra, carregadas ou não. */
+  removerGrupo(grupo: string): Promise<void>
+
+  recorrencias(): Promise<Recorrencia[]>
+  criarRecorrencia(r: Omit<Recorrencia, 'id'>): Promise<Recorrencia>
+  atualizarRecorrencia(id: string, campos: Partial<Omit<Recorrencia, 'id'>>): Promise<void>
+  removerRecorrencia(id: string): Promise<void>
+  /** Insere ignorando o que já existe (mesma recorrência e data). */
+  inserirGerados(ls: NovoLancamentoDados[]): Promise<Lancamento[]>
+
+  cartoes(): Promise<Cartao[]>
+  salvarCartao(c: NovoCartaoDados, id?: string): Promise<Cartao>
+  removerCartao(id: string): Promise<void>
+  faturasPagas(): Promise<string[]>
+  marcarFatura(cartaoId: string, mes: string, paga: boolean): Promise<void>
 }
-
-const deLinha = (r: LinhaLancamento): Lancamento => ({
-  id: r.id,
-  descricao: r.descricao,
-  valor: Number(r.valor),
-  tipo: r.tipo,
-  categoriaId: r.categoria_id,
-  data: r.data,
-  conta: r.conta ?? undefined,
-})
-
-const paraLinha = (l: NovoLancamentoDados) => ({
-  descricao: l.descricao,
-  valor: l.valor,
-  tipo: l.tipo,
-  categoria_id: l.categoriaId,
-  data: l.data,
-  conta: l.conta ?? null,
-})
-
-const COLUNAS_L = 'id, descricao, valor, tipo, categoria_id, data, conta'
-const COLUNAS_C = 'id, nome, tipo, cor, icone'
 
 interface Store {
   /** true quando roda sem Supabase, só com dados de exemplo em memória. */
@@ -44,169 +52,262 @@ interface Store {
   mes: string
   irParaMes: (n: number) => void
   categorias: Categoria[]
+  /** Lançamentos do mês visto. */
   lancamentos: Lancamento[]
+  /** Lançamentos do mês anterior ao visto, para comparar. */
+  anterior: Lancamento[]
+  /** Tudo que já foi carregado (mês, anterior, cartões e períodos pedidos no extrato). */
+  todos: Lancamento[]
+  recorrencias: Recorrencia[]
+  cartoes: Cartao[]
+  /** Chaves "cartaoId:yyyy-mm" das faturas pagas. */
+  faturasPagas: Set<string>
   metas: Meta[]
   carregando: boolean
   erro: string | null
   categoria: (id: string) => Categoria | undefined
+  cartao: (id?: string) => Cartao | undefined
+  /** Garante que o período está carregado em `todos`. */
+  carregarPeriodo: (inicio: string, fim: string) => Promise<void>
+  /** Soma das saídas da categoria no mês, lendo do banco se precisar. */
+  gastoNoMes: (categoriaId: string, mes: string) => Promise<number>
   adicionar: (l: NovoLancamentoDados) => Promise<Lancamento>
+  lancar: (l: NovoLancamentoDados, rep: Repeticao) => Promise<Lancado>
+  desfazerLancado: (r: Lancado) => Promise<void>
+  recategorizar: (r: Lancado, cat: Categoria) => Promise<Lancado>
   atualizar: (id: string, l: NovoLancamentoDados) => Promise<void>
   remover: (id: string) => Promise<void>
+  /** Apaga todas as parcelas da compra. */
+  removerGrupo: (grupo: string) => Promise<void>
+  pararRecorrencia: (id: string) => Promise<void>
   criarCategoria: (c: NovaCategoriaDados) => Promise<void>
   removerCategoria: (id: string) => Promise<void>
+  definirLimite: (id: string, limite: number | null) => Promise<void>
+  salvarCartao: (c: NovoCartaoDados, id?: string) => Promise<void>
+  removerCartao: (id: string) => Promise<void>
+  marcarFatura: (cartaoId: string, mes: string, paga: boolean) => Promise<void>
 }
 
 const Ctx = createContext<Store | null>(null)
 
-/** Erro do Supabase vira exceção com mensagem legível. */
-function checar(error: { message: string; code?: string } | null) {
-  if (!error) return
-  if (error.code === '23503') throw new Error('Essa categoria tem lançamentos. Mude eles de categoria antes de apagar.')
-  if (error.code === '23505') throw new Error('Já existe uma categoria com esse nome.')
-  throw new Error(error.message)
-}
+const porNome = <T extends { nome: string }>(a: T[]) => [...a].sort((x, y) => x.nome.localeCompare(y.nome))
+const recentes = (a: Lancamento[]) => [...a].sort((x, y) => y.data.localeCompare(x.data))
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  return supabase ? <StoreSupabase>{children}</StoreSupabase> : <StoreDemo>{children}</StoreDemo>
+  const backend = useMemo(() => (supabase ? criarBackendSupabase(supabase) : criarBackendDemo()), [])
+  return (
+    <StoreCore backend={backend} demo={!supabase}>
+      {children}
+    </StoreCore>
+  )
 }
 
-function StoreSupabase({ children }: { children: ReactNode }) {
+function StoreCore({ backend: db, demo, children }: { backend: Backend; demo: boolean; children: ReactNode }) {
   const [mes, setMes] = useState(() => mesDe(hojeISO()))
   const [categorias, setCategorias] = useState<Categoria[]>([])
-  const [lancamentos, setLancamentos] = useState<Lancamento[]>([])
+  const [recorrencias, setRecorrencias] = useState<Recorrencia[]>([])
+  const [cartoes, setCartoes] = useState<Cartao[]>([])
+  const [pagas, setPagas] = useState<Set<string>>(new Set())
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
-  const db = supabase!
 
-  useEffect(() => {
-    db.from('categorias')
-      .select(COLUNAS_C)
-      .order('nome')
-      .then(({ data, error }) => {
-        if (error) setErro(error.message)
-        else setCategorias(data as Categoria[])
-      })
-  }, [db])
+  // cache de lançamentos: o ref é lido nas funções assíncronas, o estado faz a tela renderizar
+  const cache = useRef(new Map<string, Lancamento>())
+  const [versao, setVersao] = useState(0)
+  /** Faixas de datas já buscadas, "inicio|fim". */
+  const carregados = useRef(new Set<string>())
+  const cartoesRef = useRef<Cartao[]>([])
+  cartoesRef.current = cartoes
 
+  const mexer = useCallback((f: (m: Map<string, Lancamento>) => void) => {
+    f(cache.current)
+    setVersao((v) => v + 1)
+  }, [])
+  const guardar = useCallback((ls: Lancamento[]) => mexer((m) => ls.forEach((l) => m.set(l.id, l))), [mexer])
+
+  const carregarPeriodo = useCallback(
+    async (inicio: string, fim: string) => {
+      const chave = `${inicio}|${fim}`
+      if (carregados.current.has(chave)) return
+      const ls = await db.lancamentosEntre(inicio, fim)
+      carregados.current.add(chave)
+      guardar(ls)
+    },
+    [db, guardar],
+  )
+
+  /** Cria os lançamentos das recorrências que venceram desde a última vez que o app abriu. */
+  const gerarRecorrentes = useCallback(
+    async (lista: Recorrencia[], cards: Cartao[]) => {
+      const hoje = hojeISO()
+      const novas = [...lista]
+      for (let i = 0; i < novas.length; i++) {
+        const r = novas[i]
+        const { lancamentos, geradoAte } = gerarPendentes(r, hoje, cards)
+        if (geradoAte === r.geradoAte) continue
+        if (lancamentos.length) guardar(await db.inserirGerados(lancamentos))
+        await db.atualizarRecorrencia(r.id, { geradoAte })
+        novas[i] = { ...r, geradoAte }
+      }
+      return novas
+    },
+    [db, guardar],
+  )
+
+  // carga inicial: categorias, cartões, faturas pagas, recorrências e lançamentos de cartão
   useEffect(() => {
     let ativo = true
-    setCarregando(true)
-    db.from('lancamentos')
-      .select(COLUNAS_L)
-      .gte('data', `${mes}-01`)
-      .lt('data', `${somarMes(mes, 1)}-01`)
-      .order('data', { ascending: false })
-      .order('criado_em', { ascending: false })
-      .then(({ data, error }) => {
+    ;(async () => {
+      try {
+        const [cats, cards, fp, recs] = await Promise.all([db.categorias(), db.cartoes(), db.faturasPagas(), db.recorrencias()])
         if (!ativo) return
-        if (error) setErro(error.message)
-        else {
-          setErro(null)
-          setLancamentos((data as LinhaLancamento[]).map(deLinha))
-        }
-        setCarregando(false)
-      })
+        setCategorias(porNome(cats))
+        setCartoes(porNome(cards))
+        setPagas(new Set(fp))
+        if (cards.length) guardar(await db.lancamentosDeCartao(somarMes(mesDe(hojeISO()), -6)))
+        const geradas = await gerarRecorrentes(recs, cards)
+        if (ativo) setRecorrencias(geradas)
+      } catch (e) {
+        if (ativo) setErro(e instanceof Error ? e.message : String(e))
+      }
+    })()
     return () => {
       ativo = false
     }
-  }, [db, mes])
+  }, [db, gerarRecorrentes, guardar])
 
-  const doMes = useCallback((l: Lancamento) => mesDe(l.data) === mes, [mes])
+  // mês visto e o anterior (para comparar no resumo)
+  useEffect(() => {
+    let ativo = true
+    setCarregando(true)
+    carregarPeriodo(`${somarMes(mes, -1)}-01`, `${somarMes(mes, 1)}-01`)
+      .then(() => ativo && setErro(null))
+      .catch((e) => ativo && setErro(e instanceof Error ? e.message : String(e)))
+      .finally(() => ativo && setCarregando(false))
+    return () => {
+      ativo = false
+    }
+  }, [mes, carregarPeriodo])
 
-  const adicionar = async (dados: NovoLancamentoDados) => {
-    const { data, error } = await db.from('lancamentos').insert(paraLinha(dados)).select(COLUNAS_L).single()
-    checar(error)
-    const novo = deLinha(data as LinhaLancamento)
-    if (doMes(novo)) setLancamentos((a) => [novo, ...a])
-    return novo
+  const todos = useMemo(() => {
+    void versao
+    return recentes([...cache.current.values()])
+  }, [versao])
+  const doMes = (m: string) => todos.filter((l) => mesDe(l.data) === m)
+
+  const gastoNoMes = async (categoriaId: string, m: string) => {
+    await carregarPeriodo(`${m}-01`, `${somarMes(m, 1)}-01`)
+    let s = 0
+    for (const l of cache.current.values()) if (l.categoriaId === categoriaId && l.tipo === 'saida' && mesDe(l.data) === m) s += l.valor
+    return s
   }
 
-  const atualizar = async (id: string, dados: NovoLancamentoDados) => {
-    const { data, error } = await db
-      .from('lancamentos')
-      .update(paraLinha(dados))
-      .eq('id', id)
-      .select(COLUNAS_L)
-      .single()
-    checar(error)
-    const novo = deLinha(data as LinhaLancamento)
-    setLancamentos((a) => {
-      const resto = a.filter((l) => l.id !== id)
-      return doMes(novo) ? [novo, ...resto] : resto
-    })
+  const lancar = async (dados: NovoLancamentoDados, rep: Repeticao): Promise<Lancado> => {
+    const plano = montar(dados, rep, cartoesRef.current)
+    if (plano.recorrencia) {
+      const r = await db.criarRecorrencia(plano.recorrencia)
+      const [gerada] = await gerarRecorrentes([r], cartoesRef.current)
+      setRecorrencias((a) => [...a, gerada])
+      const lancamentos = [...cache.current.values()].filter((l) => l.recorrenciaId === r.id)
+      return { lancamentos, recorrencia: gerada }
+    }
+    const novos = await db.inserir(plano.lancamentos)
+    guardar(novos)
+    return { lancamentos: novos }
   }
 
   const remover = async (id: string) => {
-    const { error } = await db.from('lancamentos').delete().eq('id', id)
-    checar(error)
-    setLancamentos((a) => a.filter((l) => l.id !== id))
+    await db.remover([id])
+    mexer((m) => m.delete(id))
   }
 
-  const criarCategoria = async (c: NovaCategoriaDados) => {
-    const { data, error } = await db.from('categorias').insert(c).select(COLUNAS_C).single()
-    checar(error)
-    setCategorias((a) => [...a, data as Categoria].sort((x, y) => x.nome.localeCompare(y.nome)))
-  }
-
-  const removerCategoria = async (id: string) => {
-    const { error } = await db.from('categorias').delete().eq('id', id)
-    checar(error)
-    setCategorias((a) => a.filter((c) => c.id !== id))
+  const pararRecorrencia = async (id: string) => {
+    await db.removerRecorrencia(id)
+    setRecorrencias((a) => a.filter((r) => r.id !== id))
+    // os lançamentos que já saíram ficam, só perdem o vínculo
+    mexer((m) => m.forEach((l, k) => l.recorrenciaId === id && m.set(k, { ...l, recorrenciaId: undefined })))
   }
 
   const valor: Store = {
-    demo: false,
+    demo,
     mes,
     irParaMes: (n) => setMes((m) => somarMes(m, n)),
     categorias,
-    lancamentos,
+    lancamentos: doMes(mes),
+    anterior: doMes(somarMes(mes, -1)),
+    todos,
+    recorrencias,
+    cartoes,
+    faturasPagas: pagas,
     metas: metasMock,
     carregando,
     erro,
     categoria: (id) => categorias.find((c) => c.id === id),
-    adicionar,
-    atualizar,
-    remover,
-    criarCategoria,
-    removerCategoria,
-  }
-
-  return <Ctx.Provider value={valor}>{children}</Ctx.Provider>
-}
-
-/** Sem .env: tudo em memória, some ao recarregar a página. */
-function StoreDemo({ children }: { children: ReactNode }) {
-  const [mes, setMes] = useState(() => mesDe(hojeISO()))
-  const [categorias, setCategorias] = useState<Categoria[]>(categoriasDemo)
-  const [todos, setTodos] = useState<Lancamento[]>(lancamentosDemo)
-  const novoId = () => `d-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
-
-  const valor: Store = {
-    demo: true,
-    mes,
-    irParaMes: (n) => setMes((m) => somarMes(m, n)),
-    categorias,
-    lancamentos: todos.filter((l) => mesDe(l.data) === mes).sort((a, b) => b.data.localeCompare(a.data)),
-    metas: metasMock,
-    carregando: false,
-    erro: null,
-    categoria: (id) => categorias.find((c) => c.id === id),
-    adicionar: async (l) => {
-      const novo = { ...l, id: novoId() }
-      setTodos((a) => [novo, ...a])
-      return novo
+    cartao: (id) => (id ? cartoes.find((c) => c.id === id) : undefined),
+    carregarPeriodo,
+    gastoNoMes,
+    lancar,
+    adicionar: async (l) => (await lancar(l, { tipo: 'unica' })).lancamentos[0],
+    desfazerLancado: async (r) => {
+      if (r.recorrencia) await pararRecorrencia(r.recorrencia.id)
+      const ids = r.lancamentos.map((l) => l.id)
+      if (ids.length) await db.remover(ids)
+      mexer((m) => ids.forEach((id) => m.delete(id)))
     },
-    atualizar: async (id, l) => setTodos((a) => a.map((x) => (x.id === id ? { ...l, id } : x))),
-    remover: async (id) => setTodos((a) => a.filter((x) => x.id !== id)),
+    recategorizar: async (r, cat) => {
+      const ids = r.lancamentos.map((l) => l.id)
+      if (ids.length) await db.recategorizar(ids, cat.id, cat.tipo)
+      let recorrencia = r.recorrencia
+      if (recorrencia) {
+        await db.atualizarRecorrencia(recorrencia.id, { categoriaId: cat.id, tipo: cat.tipo })
+        recorrencia = { ...recorrencia, categoriaId: cat.id, tipo: cat.tipo }
+        const rid = recorrencia.id
+        setRecorrencias((a) => a.map((x) => (x.id === rid ? { ...x, categoriaId: cat.id, tipo: cat.tipo } : x)))
+      }
+      const lancamentos = r.lancamentos.map((l) => ({ ...l, categoriaId: cat.id, tipo: cat.tipo }))
+      guardar(lancamentos)
+      return { lancamentos, recorrencia }
+    },
+    atualizar: async (id, l) => guardar([await db.atualizar(id, comFatura(l, cartoesRef.current))]),
+    remover,
+    removerGrupo: async (grupo) => {
+      await db.removerGrupo(grupo)
+      mexer((m) => m.forEach((l, k) => l.grupo === grupo && m.delete(k)))
+    },
+    pararRecorrencia,
     criarCategoria: async (c) => {
-      if (categorias.some((x) => x.tipo === c.tipo && x.nome === c.nome)) throw new Error('Já existe uma categoria com esse nome.')
-      setCategorias((a) => [...a, { ...c, id: novoId() }].sort((x, y) => x.nome.localeCompare(y.nome)))
+      const nova = await db.criarCategoria(c)
+      setCategorias((a) => porNome([...a, nova]))
     },
     removerCategoria: async (id) => {
-      if (todos.some((l) => l.categoriaId === id)) throw new Error('Essa categoria tem lançamentos. Mude eles de categoria antes de apagar.')
+      await db.removerCategoria(id)
       setCategorias((a) => a.filter((c) => c.id !== id))
     },
+    definirLimite: async (id, limite) => {
+      await db.definirLimite(id, limite)
+      setCategorias((a) => a.map((c) => (c.id === id ? { ...c, limite } : c)))
+    },
+    salvarCartao: async (c, id) => {
+      const salvo = await db.salvarCartao(c, id)
+      setCartoes((a) => porNome([...a.filter((x) => x.id !== salvo.id), salvo]))
+      if (!id) guardar(await db.lancamentosDeCartao(somarMes(mesDe(hojeISO()), -6)))
+    },
+    removerCartao: async (id) => {
+      await db.removerCartao(id)
+      setCartoes((a) => a.filter((c) => c.id !== id))
+      mexer((m) => m.forEach((l, k) => l.cartaoId === id && m.set(k, { ...l, cartaoId: undefined, fatura: undefined })))
+    },
+    marcarFatura: async (cartaoId, m, paga) => {
+      await db.marcarFatura(cartaoId, m, paga)
+      setPagas((s) => {
+        const n = new Set(s)
+        if (paga) n.add(`${cartaoId}:${m}`)
+        else n.delete(`${cartaoId}:${m}`)
+        return n
+      })
+    },
   }
+
   return <Ctx.Provider value={valor}>{children}</Ctx.Provider>
 }
 

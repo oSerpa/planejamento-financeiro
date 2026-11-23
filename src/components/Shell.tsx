@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { Flag, LayoutGrid, MessageCircle, Plus, ReceiptText, Settings } from 'lucide-react'
+import { CreditCard, Flag, LayoutGrid, MessageCircle, Plus, ReceiptText, Settings } from 'lucide-react'
 import { useState } from 'react'
 import { NovoLancamento } from './NovoLancamento'
 
@@ -8,6 +8,7 @@ const abas = [
   { to: '/resumo', label: 'Resumo', icon: LayoutGrid },
   { to: '/lancamentos', label: 'Extrato', icon: ReceiptText },
   { to: '/metas', label: 'Metas', icon: Flag },
+  { to: '/cartoes', label: 'Cartões', icon: CreditCard },
   { to: '/ajustes', label: 'Ajustes', icon: Settings },
 ]
 

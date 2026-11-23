@@ -8,6 +8,7 @@ import { ChatProvider } from './data/chat'
 import { Lancamentos } from './pages/Lancamentos'
 import { Metas } from './pages/Metas'
 import { Ajustes } from './pages/Ajustes'
+import { Cartoes } from './pages/Cartoes'
 import { Entrar } from './pages/Entrar'
 
 function Rotas() {
@@ -25,6 +26,7 @@ function Rotas() {
               <Route path="resumo" element={<Inicio />} />
               <Route path="lancamentos" element={<Lancamentos />} />
               <Route path="metas" element={<Metas />} />
+              <Route path="cartoes" element={<Cartoes />} />
               <Route path="ajustes" element={<Ajustes />} />
             </Route>
           </Routes>

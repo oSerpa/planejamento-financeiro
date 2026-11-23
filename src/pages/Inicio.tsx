@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ArrowDownLeft, ArrowUpRight, CalendarDays, ChevronRight, Flame, PiggyBank, Plus, Tags, Minus } from 'lucide-react'
+import { AlertTriangle, ArrowDownLeft, ArrowUpRight, CalendarDays, ChevronRight, CreditCard, Flame, PiggyBank, Plus, Minus, Settings2, TrendingDown, TrendingUp } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '../data/auth'
 import { useStore } from '../data/store'
@@ -13,6 +13,9 @@ import { Icone } from '../components/Icone'
 import { useContagem } from '../lib/useContagem'
 import { Vazio } from '../components/Vazio'
 import { FichaLancamento } from '../components/DetalheLancamento'
+import { EditarOrcamentos } from '../components/EditarOrcamentos'
+import { nivelOrcamento, somar, variacao } from '../lib/financas'
+import { somarMes } from '../lib/format'
 
 function saudacao() {
   const h = new Date().getHours()
@@ -20,10 +23,11 @@ function saudacao() {
 }
 
 export function Inicio() {
-  const { lancamentos, metas, categorias, mes, carregando, erro, demo } = useStore()
+  const { lancamentos, anterior, metas, categorias, mes, carregando, erro, demo } = useStore()
   const { nome } = useAuth()
   const [aberto, setAberto] = useState<Lancamento | null>(null)
   const [novo, setNovo] = useState<TipoLancamento | null>(null)
+  const [editandoOrc, setEditandoOrc] = useState(false)
 
   const entradas = lancamentos.filter((l) => l.tipo === 'entrada').reduce((s, l) => s + l.valor, 0)
   const saidasL = lancamentos.filter((l) => l.tipo === 'saida')
@@ -51,6 +55,36 @@ export function Inicio() {
     }))
     .filter((c) => c.total > 0)
     .sort((a, b) => b.total - a.total)
+
+  // orçamento: só categorias de saída com limite
+  const orcamentos = categorias
+    .filter((c) => c.tipo === 'saida' && c.limite)
+    .map((c) => {
+      const gasto = somar(saidasL.filter((l) => l.categoriaId === c.id))
+      return { ...c, gasto, limite: c.limite!, nivel: nivelOrcamento(gasto, c.limite!) }
+    })
+    .sort((a, b) => b.gasto / b.limite - a.gasto / a.limite)
+  const estourados = orcamentos.filter((o) => o.nivel === 'estourou').length
+  const atencao = orcamentos.filter((o) => o.nivel === 'atencao').length
+
+  // comparação: no mês atual, contra o mesmo pedaço do mês anterior (até o mesmo dia)
+  const mesAnt = somarMes(mes, -1)
+  const nomeAnt = nomeMes(`${mesAnt}-01`).split(' de ')[0]
+  const base = ehMesAtual ? anterior.filter((l) => parseISO(l.data).getDate() <= diaHoje) : anterior
+  const saidasAnt = somar(base.filter((l) => l.tipo === 'saida'))
+  const entradasAnt = somar(base.filter((l) => l.tipo === 'entrada'))
+  const varSaidas = variacao(saidas, saidasAnt)
+  const mudancas = categorias
+    .filter((c) => c.tipo === 'saida')
+    .map((c) => {
+      const agora = somar(saidasL.filter((l) => l.categoriaId === c.id))
+      const antes = somar(base.filter((l) => l.tipo === 'saida' && l.categoriaId === c.id))
+      return { ...c, agora, antes, dif: agora - antes }
+    })
+    .filter((c) => Math.abs(c.dif) >= 1)
+    .sort((a, b) => Math.abs(b.dif) - Math.abs(a.dif))
+    .slice(0, 4)
+  const maiores = [...saidasL].sort((a, b) => b.valor - a.valor).slice(0, 5)
 
   const recentes = [...lancamentos].sort((a, b) => b.data.localeCompare(a.data)).slice(0, 5)
   const guardado = metas.reduce((s, mt) => s + mt.guardado, 0)
@@ -136,11 +170,11 @@ export function Inicio() {
             </span>
             Guardar
           </Link>
-          <Link className="acao" to="/ajustes">
+          <Link className="acao" to="/cartoes">
             <span className="acao__icone">
-              <Tags size={19} strokeWidth={2} />
+              <CreditCard size={19} strokeWidth={2} />
             </span>
-            Categorias
+            Cartões
           </Link>
         </nav>
 
@@ -168,6 +202,63 @@ export function Inicio() {
           </Link>
         </section>
 
+        <div className="coluna coluna--a">
+        <section className="painel orc-v2 entra" style={{ '--i': 3 } as React.CSSProperties}>
+          <div className="painel__topo">
+            <h2 className="painel__titulo">Orçamento do mês</h2>
+            <button type="button" className="painel__link" onClick={() => setEditandoOrc(true)}>
+              <Settings2 size={14} /> {orcamentos.length ? 'Ajustar' : 'Definir'}
+            </button>
+          </div>
+          {orcamentos.length === 0 ? (
+            <p className="painel__texto">
+              Defina quanto quer gastar por mês em cada categoria. Eu aviso quando chegar em 80% e quando passar, aqui e no chat.
+            </p>
+          ) : (
+            <>
+              {(estourados > 0 || atencao > 0) && (
+                <p className={`orc-alerta ${estourados ? 'orc-alerta--estourou' : 'orc-alerta--atencao'}`}>
+                  <AlertTriangle size={15} />
+                  {estourados > 0 && `${estourados} ${estourados === 1 ? 'categoria passou' : 'categorias passaram'} do limite`}
+                  {estourados > 0 && atencao > 0 && ' e '}
+                  {atencao > 0 && `${atencao} ${atencao === 1 ? 'está perto' : 'estão perto'}`}
+                </p>
+              )}
+              <ul className="cats">
+                {orcamentos.map((o) => {
+                  const pct = (o.gasto / o.limite) * 100
+                  return (
+                    <li key={o.id} className={`cat orc orc--${o.nivel}`}>
+                      <span className="cat__icone" style={{ color: o.cor, background: `${o.cor}1c` }}>
+                        <Icone nome={o.icone} size={18} />
+                      </span>
+                      <div className="cat__meio">
+                        <div className="cat__linha">
+                          <span className="cat__nome">{o.nome}</span>
+                          <span className="orc__valores">
+                            <Valor valor={o.gasto} className="cat__valor" /> <small>de <Valor valor={o.limite} /></small>
+                          </span>
+                        </div>
+                        <div className="cat__linha cat__linha--sub">
+                          <span className="orc-barra">
+                            <span style={{ width: `${Math.min(100, pct)}%` }} />
+                          </span>
+                          <span className="orc__resta">
+                            {o.gasto > o.limite ? (
+                              <>passou <Valor valor={o.gasto - o.limite} /></>
+                            ) : (
+                              <>resta <Valor valor={o.limite - o.gasto} /></>
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            </>
+          )}
+        </section>
         <section className="painel categorias-v2 entra" style={{ '--i': 3 } as React.CSSProperties}>
           <div className="painel__topo">
             <h2 className="painel__titulo">Para onde foi</h2>
@@ -202,29 +293,6 @@ export function Inicio() {
             </ul>
           )}
         </section>
-
-        <section className="painel recentes-v2 entra" style={{ '--i': 4 } as React.CSSProperties}>
-          <div className="painel__topo">
-            <h2 className="painel__titulo">Últimos lançamentos</h2>
-            <Link to="/lancamentos" className="painel__link">
-              Ver todos <ChevronRight size={15} />
-            </Link>
-          </div>
-          {recentes.length === 0 ? (
-            carregando ? (
-              <p className="vazio vazio--curto">Carregando…</p>
-            ) : (
-              <Vazio tipo="lista" titulo="Mês em branco" texto="Toque no + para lançar a primeira entrada ou saída." />
-            )
-          ) : (
-            <ul className="lista">
-              {recentes.map((l) => (
-                <ItemLancamento key={l.id} l={l} onAbrir={setAberto} />
-              ))}
-            </ul>
-          )}
-        </section>
-
         <section className="painel metas-v2 entra" style={{ '--i': 5 } as React.CSSProperties}>
           <div className="painel__topo">
             <h2 className="painel__titulo">Metas</h2>
@@ -252,10 +320,111 @@ export function Inicio() {
             })}
           </ul>
         </section>
+        </div>
+        <div className="coluna coluna--b">
+        <section className="painel comp-v2 entra" style={{ '--i': 3 } as React.CSSProperties}>
+          <div className="painel__topo">
+            <h2 className="painel__titulo">Comparado a {nomeAnt}</h2>
+            {ehMesAtual && <span className="painel__extra">até o dia {diaHoje}</span>}
+          </div>
+          {saidasAnt === 0 && entradasAnt === 0 ? (
+            <p className="painel__texto">Sem lançamentos em {nomeAnt} para comparar.</p>
+          ) : (
+            <>
+              <div className="comp__pares">
+                <Comparacao rotulo="Gastou" agora={saidas} antes={saidasAnt} bomSubir={false} />
+                <Comparacao rotulo="Entrou" agora={entradas} antes={entradasAnt} bomSubir />
+              </div>
+              {varSaidas !== null && (
+                <p className="comp__frase">
+                  {Math.abs(varSaidas) < 1
+                    ? `Você está gastando o mesmo que em ${nomeAnt}.`
+                    : varSaidas > 0
+                      ? `Você gastou ${Math.round(varSaidas)}% a mais que em ${nomeAnt}${ehMesAtual ? ' no mesmo período' : ''}.`
+                      : `Você gastou ${Math.round(-varSaidas)}% a menos que em ${nomeAnt}${ehMesAtual ? ' no mesmo período' : ''}.`}
+                </p>
+              )}
+              {mudancas.length > 0 && (
+                <ul className="comp__lista">
+                  {mudancas.map((c) => (
+                    <li key={c.id}>
+                      <span className="comp__cat">
+                        <Icone nome={c.icone} size={15} style={{ color: c.cor }} /> {c.nome}
+                      </span>
+                      <span className={`comp__dif ${c.dif > 0 ? 'cor-saida' : 'cor-entrada'}`}>
+                        {c.dif > 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                        {c.dif > 0 ? '+' : '−'}
+                        <Valor valor={Math.abs(c.dif)} />
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          )}
+          {maiores.length > 0 && (
+            <>
+              <h3 className="comp__sub">
+                <Flame size={14} /> Maiores gastos
+              </h3>
+              <ul className="lista">
+                {maiores.map((l) => (
+                  <ItemLancamento key={l.id} l={l} onAbrir={setAberto} />
+                ))}
+              </ul>
+            </>
+          )}
+        </section>
+        <section className="painel recentes-v2 entra" style={{ '--i': 4 } as React.CSSProperties}>
+          <div className="painel__topo">
+            <h2 className="painel__titulo">Últimos lançamentos</h2>
+            <Link to="/lancamentos" className="painel__link">
+              Ver todos <ChevronRight size={15} />
+            </Link>
+          </div>
+          {recentes.length === 0 ? (
+            carregando ? (
+              <p className="vazio vazio--curto">Carregando…</p>
+            ) : (
+              <Vazio tipo="lista" titulo="Mês em branco" texto="Toque no + para lançar a primeira entrada ou saída." />
+            )
+          ) : (
+            <ul className="lista">
+              {recentes.map((l) => (
+                <ItemLancamento key={l.id} l={l} onAbrir={setAberto} />
+              ))}
+            </ul>
+          )}
+        </section>
+        </div>
       </div>
 
       {aberto && <FichaLancamento l={aberto} onFechar={() => setAberto(null)} />}
       {novo && <NovoLancamento tipoInicial={novo} onFechar={() => setNovo(null)} />}
+      {editandoOrc && <EditarOrcamentos onFechar={() => setEditandoOrc(false)} />}
+    </div>
+  )
+}
+
+function Comparacao({ rotulo, agora, antes, bomSubir }: { rotulo: string; agora: number; antes: number; bomSubir: boolean }) {
+  const v = variacao(agora, antes)
+  const subiu = (v ?? 0) > 0
+  const bom = Math.abs(v ?? 0) < 1 ? null : subiu === bomSubir
+  return (
+    <div className="comp__par">
+      <span className="numero__rotulo">{rotulo}</span>
+      <Valor valor={agora} className="numero__valor" />
+      <span className="comp__nota">
+        {v === null ? (
+          'sem base'
+        ) : (
+          <span className={bom === null ? '' : bom ? 'cor-entrada' : 'cor-saida'}>
+            {subiu ? <TrendingUp size={13} /> : <TrendingDown size={13} />} {v > 0 ? '+' : ''}
+            {Math.round(v)}%
+          </span>
+        )}{' '}
+        antes <Valor valor={antes} />
+      </span>
     </div>
   )
 }
