@@ -1,11 +1,15 @@
 import { Link } from 'react-router-dom'
 import { ArrowDownRight, ArrowUpRight, ChevronRight, PiggyBank } from 'lucide-react'
-import { categorias, hoje } from '../data/mock'
+import { useState } from 'react'
+import { useAuth } from '../data/auth'
 import { useStore } from '../data/store'
+import type { Lancamento } from '../data/types'
 import { nomeMes } from '../lib/format'
 import { Valor } from '../components/Valor'
 import { Barra } from '../components/Barra'
 import { ItemLancamento } from '../components/ItemLancamento'
+import { NovoLancamento } from '../components/NovoLancamento'
+import { SeletorMes } from '../components/SeletorMes'
 
 function saudacao() {
   const h = new Date().getHours()
@@ -13,7 +17,9 @@ function saudacao() {
 }
 
 export function Inicio() {
-  const { lancamentos, metas } = useStore()
+  const { lancamentos, metas, categorias, mes, carregando, erro } = useStore()
+  const { nome } = useAuth()
+  const [aberto, setAberto] = useState<Lancamento | null>(null)
   const entradas = lancamentos.filter((l) => l.tipo === 'entrada').reduce((s, l) => s + l.valor, 0)
   const saidas = lancamentos.filter((l) => l.tipo === 'saida').reduce((s, l) => s + l.valor, 0)
   const guardado = metas.reduce((s, m) => s + m.guardado, 0)
@@ -33,12 +39,20 @@ export function Inicio() {
 
   return (
     <div className="pagina">
-      <header className="cabecalho">
-        <p className="cabecalho__sup">{saudacao()}, Serpa</p>
-        <h1 className="cabecalho__titulo">
-          Seu mês de <em>{nomeMes(hoje).split(' ')[0]}</em>
-        </h1>
+      <header className="cabecalho cabecalho--linha">
+        <div>
+          <p className="cabecalho__sup">
+            {saudacao()}
+            {nome && `, ${nome}`}
+          </p>
+          <h1 className="cabecalho__titulo">
+            Seu mês de <em>{nomeMes(`${mes}-01`).split(' ')[0]}</em>
+          </h1>
+        </div>
+        <SeletorMes />
       </header>
+
+      {erro && <p className="alerta alerta--erro">Não deu para carregar: {erro}</p>}
 
       <div className="grade-inicio">
         <section className="saldo">
@@ -47,7 +61,11 @@ export function Inicio() {
           <div className="saldo__trilho">
             <div className="saldo__gasto" style={{ width: `${Math.min(100, pctGasto)}%` }} />
           </div>
-          <p className="saldo__nota">Você já usou {Math.round(pctGasto)}% do que entrou este mês.</p>
+          <p className="saldo__nota">
+            {entradas > 0
+              ? `Você já usou ${Math.round(pctGasto)}% do que entrou neste mês.`
+              : 'Nenhuma entrada lançada neste mês ainda.'}
+          </p>
           <div className="saldo__pares">
             <div>
               <span className="saldo__mini">
@@ -77,6 +95,7 @@ export function Inicio() {
 
         <section className="cartao categorias">
           <h2 className="secao-titulo">Para onde foi</h2>
+          {porCategoria.length === 0 && <p className="vazio vazio--curto">Nenhum gasto neste mês.</p>}
           <ul className="cat-lista">
             {porCategoria.map((c) => (
               <li key={c.id}>
@@ -100,13 +119,18 @@ export function Inicio() {
               Ver todos
             </Link>
           </div>
+          {recentes.length === 0 && (
+            <p className="vazio vazio--curto">{carregando ? 'Carregando…' : 'Nada lançado neste mês.'}</p>
+          )}
           <ul className="lista">
             {recentes.map((l) => (
-              <ItemLancamento key={l.id} l={l} />
+              <ItemLancamento key={l.id} l={l} onAbrir={setAberto} />
             ))}
           </ul>
         </section>
       </div>
+
+      {aberto && <NovoLancamento lancamento={aberto} onFechar={() => setAberto(null)} />}
     </div>
   )
 }

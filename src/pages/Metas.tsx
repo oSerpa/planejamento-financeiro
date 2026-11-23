@@ -1,7 +1,6 @@
 import { CheckCircle2, Plus } from 'lucide-react'
-import { hoje } from '../data/mock'
 import { useStore } from '../data/store'
-import { dinheiro, mesesAte, parseISO } from '../lib/format'
+import { dinheiro, hojeISO, mesesAte, parseISO } from '../lib/format'
 import { Icone } from '../components/Icone'
 import { Valor } from '../components/Valor'
 
@@ -51,7 +50,7 @@ export function Metas() {
         {metas.map((m) => {
           const pct = (m.guardado / m.alvo) * 100
           const falta = Math.max(0, m.alvo - m.guardado)
-          const meses = mesesAte(m.prazo, hoje)
+          const meses = mesesAte(m.prazo, hojeISO())
           const concluida = falta === 0
           return (
             <article key={m.id} className={`cartao meta ${concluida ? 'meta--ok' : ''}`}>

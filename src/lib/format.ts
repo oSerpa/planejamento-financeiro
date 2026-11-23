@@ -28,3 +28,29 @@ export function mesesAte(prazoISO: string, hojeISO: string) {
   const b = parseISO(prazoISO)
   return Math.max(0, (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth()))
 }
+
+/** Data de hoje no fuso do aparelho, em yyyy-mm-dd. */
+export function hojeISO() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/** "2026-11" a partir de "2026-11-23". */
+export const mesDe = (iso: string) => iso.slice(0, 7)
+
+/** Soma meses a um "yyyy-mm". */
+export function somarMes(mes: string, n: number) {
+  const [a, m] = mes.split('-').map(Number)
+  const d = new Date(a, m - 1 + n, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+/** Lê "1.234,56", "12,5" ou "12.50" e devolve número. */
+export function lerValor(texto: string) {
+  const t = texto.trim()
+  if (!t.includes(',') && /^\d+\.\d{1,2}$/.test(t)) return Number(t)
+  return Number(t.replace(/\./g, '').replace(',', '.'))
+}
+
+/** 12.5 vira "12,50" para preencher o campo de valor. */
+export const valorParaCampo = (v: number) => v.toFixed(2).replace('.', ',')
