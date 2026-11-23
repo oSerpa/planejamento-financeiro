@@ -1,10 +1,11 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { Flag, House, Plus, ReceiptText, Settings } from 'lucide-react'
+import { Flag, LayoutGrid, MessageCircle, Plus, ReceiptText, Settings } from 'lucide-react'
 import { useState } from 'react'
 import { NovoLancamento } from './NovoLancamento'
 
 const abas = [
-  { to: '/', label: 'Início', icon: House },
+  { to: '/', label: 'Chat', icon: MessageCircle },
+  { to: '/resumo', label: 'Resumo', icon: LayoutGrid },
   { to: '/lancamentos', label: 'Extrato', icon: ReceiptText },
   { to: '/metas', label: 'Metas', icon: Flag },
   { to: '/ajustes', label: 'Ajustes', icon: Settings },
@@ -46,7 +47,7 @@ export function Shell() {
         <button className="doca__mais" onClick={() => setAberto(true)} aria-label="Novo lançamento">
           <Plus size={24} strokeWidth={2.5} />
         </button>
-        {abas.slice(2).map(({ to, label, icon: I }) => (
+        {abas.slice(2, 4).map(({ to, label, icon: I }) => (
           <NavLink key={to} to={to} end className="doca__link">
             <I size={21} strokeWidth={1.9} />
             <span>{label}</span>

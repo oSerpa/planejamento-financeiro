@@ -69,6 +69,7 @@ begin
     (new.id, 'Outras entradas', 'entrada', '#8A928C', 'circle'),
     (new.id, 'Moradia',     'saida',   '#C2553A', 'home'),
     (new.id, 'Mercado',     'saida',   '#D08A2E', 'cart'),
+    (new.id, 'Alimentação', 'saida',   '#B8642E', 'food'),
     (new.id, 'Transporte',  'saida',   '#4E6E8E', 'bus'),
     (new.id, 'Lazer',       'saida',   '#8C5A9E', 'ticket'),
     (new.id, 'Saúde',       'saida',   '#3E8E8A', 'heart'),

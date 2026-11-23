@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
-import { LogOut, Plus, Trash2 } from 'lucide-react'
+import { LogOut, Plus, Trash2, X } from 'lucide-react'
+import { useChat } from '../data/chat'
 import { useAuth } from '../data/auth'
 import { useStore } from '../data/store'
 import type { TipoLancamento } from '../data/types'
@@ -11,6 +12,8 @@ const cores = ['#3F7D58', '#6B8F3A', '#C2553A', '#D08A2E', '#C99A2E', '#4E6E8E',
 export function Ajustes() {
   const { categorias, criarCategoria, removerCategoria, demo } = useStore()
   const { sessao, sair } = useAuth()
+  const { aprendidas, esquecer } = useChat()
+  const palavras = Object.entries(aprendidas).sort(([a], [b]) => a.localeCompare(b))
   const [tipo, setTipo] = useState<TipoLancamento>('saida')
   const [nome, setNome] = useState('')
   const [cor, setCor] = useState(cores[2])
@@ -131,8 +134,37 @@ export function Ajustes() {
         </form>
       </section>
 
+      <section className="painel ajustes entra" style={{ '--i': 1 } as React.CSSProperties}>
+        <div className="painel__topo">
+          <h2 className="painel__titulo">Palavras que o chat aprendeu</h2>
+          <span className="painel__extra">{palavras.length}</span>
+        </div>
+        {palavras.length === 0 ? (
+          <p className="conta__email">
+            Quando você troca a categoria de um lançamento no chat, a palavra fica guardada aqui e da próxima vez ele já acerta.
+          </p>
+        ) : (
+          <ul className="aprendidas">
+            {palavras.map(([w, id]) => {
+              const c = categorias.find((x) => x.id === id)
+              return (
+                <li key={w} className="aprendida">
+                  <span className="aprendida__palavra">{w}</span>
+                  <span className="aprendida__cat" style={{ color: c?.cor }}>
+                    {c && <Icone nome={c.icone} size={14} />} {c?.nome ?? 'Categoria apagada'}
+                  </span>
+                  <button type="button" className="btn-icone" onClick={() => esquecer(w)} aria-label={`Esquecer ${w}`}>
+                    <X size={16} />
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </section>
+
       {demo ? (
-        <section className="painel ajustes conta entra" style={{ '--i': 1 } as React.CSSProperties}>
+        <section className="painel ajustes conta entra" style={{ '--i': 2 } as React.CSSProperties}>
           <div>
             <span className="rotulo">Modo demonstração</span>
             <p className="conta__email">
@@ -141,7 +173,7 @@ export function Ajustes() {
           </div>
         </section>
       ) : (
-        <section className="painel ajustes conta entra" style={{ '--i': 1 } as React.CSSProperties}>
+        <section className="painel ajustes conta entra" style={{ '--i': 2 } as React.CSSProperties}>
           <div>
             <span className="rotulo">Conta</span>
             <p className="conta__email">{sessao?.user.email}</p>
