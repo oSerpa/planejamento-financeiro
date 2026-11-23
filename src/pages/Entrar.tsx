@@ -41,8 +41,27 @@ export function Entrar() {
 
   return (
     <div className="entrar">
-      <form className="entrar__cartao" onSubmit={enviar}>
-        <div className="marca">
+      <aside className="entrar__vitrine" aria-hidden>
+        <div className="marca marca--clara">
+          <span className="marca__selo">c</span>
+          <span className="marca__nome">caixinha</span>
+        </div>
+        <p className="entrar__frase">Saiba para onde vai cada real, sem planilha.</p>
+        <div className="entrar__amostra">
+          <span className="entrar__amostra-rotulo">Sobrou no mês</span>
+          <span className="entrar__amostra-valor">
+            <small>R$</small>1.284<small>,50</small>
+          </span>
+          <span className="entrar__amostra-barra">
+            <i style={{ flexGrow: 45, background: '#C2553A' }} />
+            <i style={{ flexGrow: 20, background: '#D08A2E' }} />
+            <i style={{ flexGrow: 12, background: '#5A6BB0' }} />
+            <i style={{ flexGrow: 30 }} className="entrar__amostra-sobra" />
+          </span>
+        </div>
+      </aside>
+      <form className="entrar__cartao entra" onSubmit={enviar}>
+        <div className="marca entrar__marca-celular">
           <span className="marca__selo">c</span>
           <span className="marca__nome">caixinha</span>
         </div>

@@ -5,7 +5,7 @@ import { NovoLancamento } from './NovoLancamento'
 
 const abas = [
   { to: '/', label: 'Início', icon: House },
-  { to: '/lancamentos', label: 'Lançamentos', icon: ReceiptText },
+  { to: '/lancamentos', label: 'Extrato', icon: ReceiptText },
   { to: '/metas', label: 'Metas', icon: Flag },
   { to: '/ajustes', label: 'Ajustes', icon: Settings },
 ]
@@ -40,7 +40,7 @@ export function Shell() {
         {abas.slice(0, 2).map(({ to, label, icon: I }) => (
           <NavLink key={to} to={to} end className="doca__link">
             <I size={21} strokeWidth={1.9} />
-            <span>{label === 'Lançamentos' ? 'Extrato' : label}</span>
+            <span>{label}</span>
           </NavLink>
         ))}
         <button className="doca__mais" onClick={() => setAberto(true)} aria-label="Novo lançamento">

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Trash2, X } from 'lucide-react'
 import { useStore } from '../data/store'
 import type { Lancamento, TipoLancamento } from '../data/types'
-import { hojeISO, lerValor, valorParaCampo } from '../lib/format'
+import { hojeISO, isoDeslocado, lerValor, valorParaCampo } from '../lib/format'
 import { Icone } from './Icone'
 
 interface Props {
@@ -28,6 +28,11 @@ export function NovoLancamento({ onFechar, lancamento, tipoInicial = 'saida' }: 
   const [erro, setErro] = useState<string | null>(null)
 
   const cats = categorias.filter((c) => c.tipo === tipo)
+  const hoje = hojeISO()
+  const atalhosData: [string, string][] = [
+    ['Hoje', hoje],
+    ['Ontem', isoDeslocado(hoje, -1)],
+  ]
   const numero = lerValor(valor)
   const valido = numero > 0 && descricao.trim().length > 0 && cats.some((c) => c.id === categoriaId) && data
 
@@ -58,6 +63,7 @@ export function NovoLancamento({ onFechar, lancamento, tipoInicial = 'saida' }: 
   return (
     <div className="sheet-fundo" onClick={onFechar}>
       <form className="sheet" onClick={(e) => e.stopPropagation()} onSubmit={salvar}>
+        <div className="sheet__alca" />
         <div className="sheet__topo">
           <h2>{editando ? 'Editar lançamento' : 'Novo lançamento'}</h2>
           <button type="button" className="btn-icone" onClick={onFechar} aria-label="Fechar">
@@ -65,7 +71,8 @@ export function NovoLancamento({ onFechar, lancamento, tipoInicial = 'saida' }: 
           </button>
         </div>
 
-        <div className="segmento" data-tipo={tipo}>
+        <div className="segmento segmento--deslizante" data-tipo={tipo}>
+          <span className="segmento__marca" aria-hidden />
           <button type="button" className={tipo === 'saida' ? 'ativo' : ''} onClick={() => trocarTipo('saida')}>
             Saída
           </button>
@@ -75,7 +82,7 @@ export function NovoLancamento({ onFechar, lancamento, tipoInicial = 'saida' }: 
         </div>
 
         <label className={`campo-valor campo-valor--${tipo}`}>
-          <span>R$</span>
+          <span>{tipo === 'saida' ? '−' : '+'} R$</span>
           <input
             inputMode="decimal"
             placeholder="0,00"
@@ -97,36 +104,58 @@ export function NovoLancamento({ onFechar, lancamento, tipoInicial = 'saida' }: 
 
         <div className="campo">
           <span className="campo__rotulo">Categoria</span>
-          <div className="chips">
+          <div className="cat-grade">
             {cats.map((c) => (
               <button
                 type="button"
                 key={c.id}
-                className={`chip ${categoriaId === c.id ? 'chip--ativo' : ''}`}
+                className={`cat-op ${categoriaId === c.id ? 'cat-op--ativa' : ''}`}
                 style={{ '--cor': c.cor } as React.CSSProperties}
                 onClick={() => setCategoriaId(c.id)}
+                aria-pressed={categoriaId === c.id}
               >
-                <Icone nome={c.icone} size={15} />
-                {c.nome}
+                <span className="cat-op__icone">
+                  <Icone nome={c.icone} size={19} />
+                </span>
+                <span className="cat-op__nome">{c.nome}</span>
               </button>
             ))}
-            {cats.length === 0 && (
-              <Link to="/ajustes" className="link" onClick={onFechar}>
-                Crie uma categoria de {tipo === 'saida' ? 'saída' : 'entrada'} primeiro
-              </Link>
-            )}
           </div>
+          {cats.length === 0 && (
+            <Link to="/ajustes" className="link" onClick={onFechar}>
+              Crie uma categoria de {tipo === 'saida' ? 'saída' : 'entrada'} primeiro
+            </Link>
+          )}
         </div>
 
-        <label className="campo">
+        <div className="campo">
           <span className="campo__rotulo">Data</span>
-          <input type="date" required value={data} onChange={(e) => setData(e.target.value)} />
-        </label>
+          <div className="datas">
+            {atalhosData.map(([rotulo, iso]) => (
+              <button
+                type="button"
+                key={rotulo}
+                className={`data-op ${data === iso ? 'data-op--ativa' : ''}`}
+                onClick={() => setData(iso)}
+              >
+                {rotulo}
+              </button>
+            ))}
+            <input
+              type="date"
+              required
+              aria-label="Outra data"
+              className={`data-op data-op--campo ${atalhosData.some(([, iso]) => iso === data) ? '' : 'data-op--ativa'}`}
+              value={data}
+              onChange={(e) => setData(e.target.value)}
+            />
+          </div>
+        </div>
 
         {erro && <p className="alerta alerta--erro">{erro}</p>}
 
         <button className="btn btn--primario btn--largo" disabled={!valido || salvando}>
-          {salvando ? 'Salvando…' : 'Salvar'}
+          {salvando ? 'Salvando…' : editando ? 'Salvar alterações' : `Lançar ${tipo === 'saida' ? 'saída' : 'entrada'}`}
         </button>
         {lancamento && (
           <button
