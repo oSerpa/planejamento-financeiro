@@ -1,3 +1,4 @@
+import { Repeat } from 'lucide-react'
 import { useStore } from '../data/store'
 import type { Lancamento } from '../data/types'
 import { Icone } from './Icone'
@@ -6,7 +7,9 @@ import { Valor } from './Valor'
 const semCategoria = { nome: 'Sem categoria', cor: '#8A928C', icone: 'circle' }
 
 export function ItemLancamento({ l, onAbrir }: { l: Lancamento; onAbrir?: (l: Lancamento) => void }) {
-  const cat = useStore().categoria(l.categoriaId) ?? semCategoria
+  const { categoria, cartao } = useStore()
+  const cat = categoria(l.categoriaId) ?? semCategoria
+  const k = cartao(l.cartaoId)
   const conteudo = (
     <>
       <span className="item__icone" style={{ color: cat.cor, background: `${cat.cor}1f` }}>
@@ -16,7 +19,9 @@ export function ItemLancamento({ l, onAbrir }: { l: Lancamento; onAbrir?: (l: La
         <span className="item__desc">{l.descricao}</span>
         <span className="item__meta">
           {cat.nome}
-          {l.conta && <> · {l.conta}</>}
+          {k ? <> · {k.nome}</> : l.conta && <> · {l.conta}</>}
+          {l.parcelas && <> · {l.parcela}/{l.parcelas}</>}
+          {l.recorrenciaId && <> · <Repeat size={11} className="item__rep" aria-label="todo mês" /></>}
         </span>
       </span>
       <Valor valor={l.valor} sinal={l.tipo} className="item__valor" />

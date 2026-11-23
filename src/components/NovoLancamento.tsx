@@ -2,8 +2,9 @@ import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { Trash2, X } from 'lucide-react'
 import { useStore } from '../data/store'
-import type { Lancamento, TipoLancamento } from '../data/types'
-import { hojeISO, isoDeslocado, lerValor, valorParaCampo } from '../lib/format'
+import type { Lancamento, Repeticao, TipoLancamento } from '../data/types'
+import { dinheiro, hojeISO, isoDeslocado, lerValor, parseISO, valorParaCampo } from '../lib/format'
+import { dividir } from '../lib/financas'
 import { Icone } from './Icone'
 
 interface Props {
@@ -15,7 +16,7 @@ interface Props {
 }
 
 export function NovoLancamento({ onFechar, lancamento, tipoInicial = 'saida' }: Props) {
-  const { categorias, adicionar, atualizar, remover } = useStore()
+  const { categorias, cartoes, lancar, atualizar, remover, removerGrupo } = useStore()
   const editando = Boolean(lancamento)
   const [tipo, setTipo] = useState<TipoLancamento>(lancamento?.tipo ?? tipoInicial)
   const [valor, setValor] = useState(lancamento ? valorParaCampo(lancamento.valor) : '')
@@ -24,6 +25,9 @@ export function NovoLancamento({ onFechar, lancamento, tipoInicial = 'saida' }: 
     lancamento?.categoriaId ?? categorias.find((c) => c.tipo === (lancamento?.tipo ?? tipoInicial))?.id ?? '',
   )
   const [data, setData] = useState(lancamento?.data ?? hojeISO())
+  const [cartaoId, setCartaoId] = useState<string | undefined>(lancamento?.cartaoId)
+  const [repetir, setRepetir] = useState<Repeticao['tipo']>('unica')
+  const [parcelas, setParcelas] = useState('2')
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
 
@@ -34,10 +38,12 @@ export function NovoLancamento({ onFechar, lancamento, tipoInicial = 'saida' }: 
     ['Ontem', isoDeslocado(hoje, -1)],
   ]
   const numero = lerValor(valor)
+  const nParcelas = Math.min(72, Math.max(2, Math.round(Number(parcelas) || 2)))
   const valido = numero > 0 && descricao.trim().length > 0 && cats.some((c) => c.id === categoriaId) && data
 
   function trocarTipo(t: TipoLancamento) {
     setTipo(t)
+    if (t === 'entrada' && repetir === 'parcelado') setRepetir('unica')
     setCategoriaId(categorias.find((c) => c.tipo === t)?.id ?? '')
   }
 
@@ -56,8 +62,11 @@ export function NovoLancamento({ onFechar, lancamento, tipoInicial = 'saida' }: 
   function salvar(e: FormEvent) {
     e.preventDefault()
     if (!valido || salvando) return
-    const dados = { tipo, valor: numero, descricao: descricao.trim(), categoriaId, data, conta: lancamento?.conta }
-    executar(() => (lancamento ? atualizar(lancamento.id, dados) : adicionar(dados)))
+    const dados = { ...lancamento, tipo, valor: numero, descricao: descricao.trim(), categoriaId, data, cartaoId: tipo === 'saida' ? cartaoId : undefined }
+    delete (dados as Partial<Lancamento>).id
+    const rep: Repeticao =
+      repetir === 'mensal' ? { tipo: 'mensal', dia: parseISO(data).getDate() } : repetir === 'parcelado' ? { tipo: 'parcelado', parcelas: nParcelas } : { tipo: 'unica' }
+    executar(() => (lancamento ? atualizar(lancamento.id, dados) : lancar(dados, rep)))
   }
 
   return (
@@ -152,10 +161,58 @@ export function NovoLancamento({ onFechar, lancamento, tipoInicial = 'saida' }: 
           </div>
         </div>
 
+        {tipo === 'saida' && cartoes.length > 0 && (
+          <div className="campo">
+            <span className="campo__rotulo">Pagou com</span>
+            <div className="datas">
+              <button type="button" className={`data-op ${!cartaoId ? 'data-op--ativa' : ''}`} onClick={() => setCartaoId(undefined)}>
+                Débito ou pix
+              </button>
+              {cartoes.map((c) => (
+                <button type="button" key={c.id} className={`data-op ${cartaoId === c.id ? 'data-op--ativa' : ''}`} onClick={() => setCartaoId(c.id)}>
+                  {c.nome}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!editando && (
+          <div className="campo">
+            <span className="campo__rotulo">Repetir</span>
+            <div className="datas">
+              {(
+                [
+                  ['unica', 'Uma vez'],
+                  ['mensal', 'Todo mês'],
+                  ...(tipo === 'saida' ? [['parcelado', 'Parcelado']] : []),
+                ] as [Repeticao['tipo'], string][]
+              ).map(([k, rotulo]) => (
+                <button type="button" key={k} className={`data-op ${repetir === k ? 'data-op--ativa' : ''}`} onClick={() => setRepetir(k)}>
+                  {rotulo}
+                </button>
+              ))}
+              {repetir === 'parcelado' && tipo === 'saida' && (
+                <label className="data-op data-op--campo parcelas-campo">
+                  <input inputMode="numeric" value={parcelas} onChange={(e) => setParcelas(e.target.value.replace(/\D/g, '').slice(0, 2))} aria-label="Número de parcelas" />
+                  x
+                </label>
+              )}
+            </div>
+            {repetir === 'mensal' && <p className="campo__ajuda">Lança sozinho todo dia {parseISO(data).getDate()}. Dá para parar em Ajustes.</p>}
+            {repetir === 'parcelado' && tipo === 'saida' && numero > 0 && (
+              <p className="campo__ajuda">
+                {nParcelas}x de {dinheiro(dividir(numero, nParcelas)[1])}, uma por mês{cartaoId ? ', cada uma numa fatura' : ''}. O valor acima é o total.
+              </p>
+            )}
+          </div>
+        )}
+        {lancamento?.parcelas && <p className="campo__ajuda">Parcela {lancamento.parcela} de {lancamento.parcelas}. Editar aqui muda só esta parcela.</p>}
+
         {erro && <p className="alerta alerta--erro">{erro}</p>}
 
         <button className="btn btn--primario btn--largo" disabled={!valido || salvando}>
-          {salvando ? 'Salvando…' : editando ? 'Salvar alterações' : `Lançar ${tipo === 'saida' ? 'saída' : 'entrada'}`}
+          {salvando ? 'Salvando…' : editando ? 'Salvar alterações' : repetir === 'parcelado' ? `Lançar em ${nParcelas}x` : repetir === 'mensal' ? 'Salvar recorrente' : `Lançar ${tipo === 'saida' ? 'saída' : 'entrada'}`}
         </button>
         {lancamento && (
           <button
@@ -164,7 +221,17 @@ export function NovoLancamento({ onFechar, lancamento, tipoInicial = 'saida' }: 
             disabled={salvando}
             onClick={() => executar(() => remover(lancamento.id))}
           >
-            <Trash2 size={17} /> Apagar lançamento
+            <Trash2 size={17} /> Apagar {lancamento.parcelas ? 'só esta parcela' : 'lançamento'}
+          </button>
+        )}
+        {lancamento?.grupo && (
+          <button
+            type="button"
+            className="btn btn--fantasma btn--largo btn--perigo"
+            disabled={salvando}
+            onClick={() => executar(() => removerGrupo(lancamento.grupo!))}
+          >
+            <Trash2 size={17} /> Apagar as {lancamento.parcelas} parcelas
           </button>
         )}
       </form>

@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowDownLeft, ArrowUp, ArrowUpRight, Check, ChevronRight, RotateCcw, Settings, Sparkles, Tag, Undo2 } from 'lucide-react'
+import { AlertTriangle, ArrowDownLeft, ArrowUp, ArrowUpRight, CalendarClock, Check, ChevronRight, CreditCard, Layers, Repeat, RotateCcw, Settings, Sparkles, Tag, Undo2 } from 'lucide-react'
 import { useAuth } from '../data/auth'
 import { useStore } from '../data/store'
-import { useChat, type ItemSalvo, type Mensagem } from '../data/chat'
+import { useChat, type ItemSalvo, type Mensagem, type Orcamento } from '../data/chat'
 import { EXEMPLOS } from '../lib/interpretar'
-import { diaRelativo, hojeISO, nomeMes } from '../lib/format'
+import { diaRelativo, hojeISO, nomeMes, parseISO } from '../lib/format'
+import { nivelOrcamento, somar } from '../lib/financas'
 import { Valor } from '../components/Valor'
 import { Icone } from '../components/Icone'
 
@@ -144,6 +145,16 @@ function Balao({ m, onDica }: { m: Mensagem; onDica: (d: string) => void }) {
       </div>
     )
   }
+  if (m.tipo === 'orcamentos')
+    return (
+      <div className="bolha bolha--bot bolha--recibo">
+        <p>{m.salvo ? 'Orçamento salvo. Te aviso quando chegar em 80% e quando passar.' : `Seus orçamentos em ${nomeMes(`${m.mes}-01`).split(' de ')[0]}:`}</p>
+        {m.itens.map((o) => (
+          <LinhaOrc key={o.categoriaId} categoriaId={o.categoriaId} o={o} />
+        ))}
+      </div>
+    )
+  if (m.tipo === 'faturas') return <Faturas itens={m.itens} />
   const ativos = m.itens.filter((i) => !i.desfeito).length
   return (
     <div className="bolha bolha--bot bolha--recibo">
@@ -158,11 +169,12 @@ function Balao({ m, onDica }: { m: Mensagem; onDica: (d: string) => void }) {
 }
 
 function Recibo({ it, msgId, idx }: { it: ItemSalvo; msgId: string; idx: number }) {
-  const { categoria, categorias } = useStore()
+  const { categoria, categorias, cartao: acharCartao } = useStore()
   const { trocarCategoria, desfazer, refazer } = useChat()
   const [trocando, setTrocando] = useState(it.origem === 'padrao' && !it.aprendeu)
   const l = it.lanc
   const cat = categoria(l.categoriaId) ?? semCategoria
+  const cartao = acharCartao(l.cartaoId)
   const grupos = (['saida', 'entrada'] as const).map((t) => ({ t, cats: categorias.filter((c) => c.tipo === t) }))
 
   return (
@@ -174,11 +186,15 @@ function Recibo({ it, msgId, idx }: { it: ItemSalvo; msgId: string; idx: number 
         <span className="item__texto">
           <span className="item__desc">{l.descricao}</span>
           <span className="item__meta">
-            {l.tipo === 'entrada' ? 'Entrada' : 'Saída'} · {cat.nome} · {diaRelativo(l.data, hojeISO())}
+            {l.tipo === 'entrada' ? 'Entrada' : 'Saída'} · {cat.nome} · {l.id ? diaRelativo(l.data, hojeISO()) : 'ainda não lançou'}
+            {cartao && <> · {cartao.nome}</>}
           </span>
         </span>
         <Valor valor={l.valor} sinal={l.tipo} className="item__valor" />
       </div>
+
+      {!it.desfeito && <Repeticao it={it} />}
+      {!it.desfeito && it.orcamento && <AvisoOrcamento nome={cat.nome} o={it.orcamento} />}
 
       {it.desfeito ? (
         <div className="recibo__acoes">
@@ -229,6 +245,117 @@ function Recibo({ it, msgId, idx }: { it: ItemSalvo; msgId: string; idx: number 
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+/** Linha extra no cartão: "Todo mês, dia 23" ou "10x de R$ 200". */
+function Repeticao({ it }: { it: ItemSalvo }) {
+  const r = it.repeticao
+  if (!r || r.tipo === 'unica') return null
+  if (r.tipo === 'parcelado') {
+    const ls = it.lancado?.lancamentos ?? []
+    const ultima = [...ls].sort((a, b) => b.data.localeCompare(a.data))[0]
+    return (
+      <p className="recibo__extra">
+        <Layers size={14} /> {r.parcelas}x de <Valor valor={it.lanc.valor} />, total <Valor valor={somar(ls)} />
+        {ultima && <> · última em {parseISO(ultima.data).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }).replace('.', '')}</>}
+      </p>
+    )
+  }
+  const proxima = it.lanc.id ? null : parseISO(it.lanc.data).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' })
+  return (
+    <p className="recibo__extra">
+      <Repeat size={14} /> Todo mês, dia {r.dia}
+      {proxima && (
+        <>
+          {' '}
+          · <CalendarClock size={14} /> começa em {proxima}
+        </>
+      )}
+    </p>
+  )
+}
+
+function AvisoOrcamento({ nome, o }: { nome: string; o: Orcamento }) {
+  const nivel = nivelOrcamento(o.gasto, o.limite)
+  const pct = Math.round((o.gasto / o.limite) * 100)
+  return (
+    <div className={`orc-aviso orc-aviso--${nivel}`}>
+      <div className="orc-aviso__linha">
+        {nivel !== 'ok' && <AlertTriangle size={14} />}
+        <span>
+          {nivel === 'estourou' ? (
+            <>
+              Passou do orçamento de {nome} em <Valor valor={o.gasto - o.limite} />
+            </>
+          ) : nivel === 'atencao' ? (
+            <>Chegou em {pct}% do orçamento de {nome}</>
+          ) : (
+            <>Orçamento de {nome}</>
+          )}
+        </span>
+        <span className="orc-aviso__num">
+          <Valor valor={o.gasto} /> / <Valor valor={o.limite} />
+        </span>
+      </div>
+      <span className="orc-barra">
+        <span style={{ width: `${Math.min(100, pct)}%` }} />
+      </span>
+    </div>
+  )
+}
+
+function LinhaOrc({ categoriaId, o }: { categoriaId: string; o: Orcamento }) {
+  const c = useStore().categoria(categoriaId)
+  if (!c) return null
+  return (
+    <div className="recibo">
+      <div className="recibo__linha">
+        <span className="item__icone" style={{ color: c.cor, background: `${c.cor}1f` }}>
+          <Icone nome={c.icone} size={18} />
+        </span>
+        <span className="item__texto">
+          <span className="item__desc">{c.nome}</span>
+          <span className="item__meta">
+            {o.gasto > o.limite ? 'Passou' : 'Restam'} <Valor valor={Math.abs(o.limite - o.gasto)} />
+          </span>
+        </span>
+        <span className="item__valor">{Math.round((o.gasto / o.limite) * 100)}%</span>
+      </div>
+      <AvisoOrcamento nome={c.nome} o={o} />
+    </div>
+  )
+}
+
+function Faturas({ itens }: { itens: { cartaoId: string; mes: string; total: number; disponivel: number }[] }) {
+  const { cartao } = useStore()
+  return (
+    <div className="bolha bolha--bot bolha--recibo">
+      <p>Faturas abertas agora:</p>
+      {itens.map((f) => {
+        const c = cartao(f.cartaoId)
+        if (!c) return null
+        return (
+          <div key={f.cartaoId} className="recibo">
+            <div className="recibo__linha">
+              <span className="item__icone" style={{ color: c.cor, background: `${c.cor}1f` }}>
+                <CreditCard size={18} strokeWidth={1.75} />
+              </span>
+              <span className="item__texto">
+                <span className="item__desc">{c.nome}</span>
+                <span className="item__meta">
+                  vence {c.vencimento}/{f.mes.slice(5)} · livre <Valor valor={f.disponivel} />
+                </span>
+              </span>
+              <Valor valor={f.total} className="item__valor" />
+            </div>
+          </div>
+        )
+      })}
+      <Link to="/cartoes" className="link">
+        Abrir cartões
+      </Link>
     </div>
   )
 }
