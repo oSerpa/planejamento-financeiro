@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import { hojeISO, mesDe, somarMes } from '../lib/format'
 import { comFatura, gerarPendentes, montar } from '../lib/financas'
 import { metas as metasMock } from './mock'
-import { criarBackendDemo } from './demo'
+import { categoriasDemo, criarBackendDemo } from './demo'
 import { criarBackendSupabase } from './backend'
 import type {
   Cartao, Categoria, Lancado, Lancamento, Meta, NovaCategoriaDados, NovoCartaoDados, NovoLancamentoDados, Recorrencia, Repeticao,
@@ -90,6 +90,10 @@ interface Store {
 
 const Ctx = createContext<Store | null>(null)
 
+/** Mesmas categorias que o gatilho do schema.sql cria. */
+const criarPadrao = (db: Backend) =>
+  Promise.all(categoriasDemo.map(({ nome, tipo, cor, icone }) => db.criarCategoria({ nome, tipo, cor, icone })))
+
 const porNome = <T extends { nome: string }>(a: T[]) => [...a].sort((x, y) => x.nome.localeCompare(y.nome))
 const recentes = (a: Lancamento[]) => [...a].sort((x, y) => y.data.localeCompare(x.data))
 
@@ -109,7 +113,10 @@ function StoreCore({ backend: db, demo, children }: { backend: Backend; demo: bo
   const [cartoes, setCartoes] = useState<Cartao[]>([])
   const [pagas, setPagas] = useState<Set<string>>(new Set())
   const [carregando, setCarregando] = useState(true)
-  const [erro, setErro] = useState<string | null>(null)
+  const [erroMes, setErro] = useState<string | null>(null)
+  // erro da carga inicial fica separado para a carga do mês não apagar
+  const [erroInicial, setErroInicial] = useState<string | null>(null)
+  const erro = erroInicial ?? erroMes
 
   // cache de lançamentos: o ref é lido nas funções assíncronas, o estado faz a tela renderizar
   const cache = useRef(new Map<string, Lancamento>())
@@ -161,20 +168,23 @@ function StoreCore({ backend: db, demo, children }: { backend: Backend; demo: bo
       try {
         const [cats, cards, fp, recs] = await Promise.all([db.categorias(), db.cartoes(), db.faturasPagas(), db.recorrencias()])
         if (!ativo) return
-        setCategorias(porNome(cats))
+        // conta sem categorias (criada antes do schema.sql ou sem o gatilho): cria as padrão
+        const lista = cats.length || demo ? cats : await criarPadrao(db)
+        if (!ativo) return
+        setCategorias(porNome(lista))
         setCartoes(porNome(cards))
         setPagas(new Set(fp))
         if (cards.length) guardar(await db.lancamentosDeCartao(somarMes(mesDe(hojeISO()), -6)))
         const geradas = await gerarRecorrentes(recs, cards)
         if (ativo) setRecorrencias(geradas)
       } catch (e) {
-        if (ativo) setErro(e instanceof Error ? e.message : String(e))
+        if (ativo) setErroInicial(e instanceof Error ? e.message : String(e))
       }
     })()
     return () => {
       ativo = false
     }
-  }, [db, gerarRecorrentes, guardar])
+  }, [db, demo, gerarRecorrentes, guardar])
 
   // mês visto e o anterior (para comparar no resumo)
   useEffect(() => {

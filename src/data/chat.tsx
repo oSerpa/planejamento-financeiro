@@ -175,6 +175,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       return por({ id: novoId(), de: 'bot', tipo: 'orcamentos', mes: mesDe(hojeISO()), itens: [{ categoriaId: orc.categoria.id, gasto, limite: orc.valor }], salvo: true })
     }
 
+    if (store.categorias.length === 0) {
+      return texto(
+        store.erro
+          ? `Não consegui carregar suas categorias (${store.erro}). Recarregue a página e tente de novo.`
+          : 'Você ainda não tem categorias, então não tenho onde anotar. Crie uma em Ajustes e manda de novo.',
+      )
+    }
     const lidos = interpretar(t, store.categorias, aprendidas, hojeISO(), store.cartoes)
     if (lidos.length === 0) return texto('Não achei um valor nessa frase. Me fala quanto foi, tipo assim:', EXEMPLOS.slice(0, 3))
 
