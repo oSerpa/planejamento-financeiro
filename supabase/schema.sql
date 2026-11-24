@@ -180,3 +180,11 @@ create policy "faturas: tudo nas minhas" on public.faturas_pagas
 drop policy if exists "recorrencias: tudo nas minhas" on public.recorrencias;
 create policy "recorrencias: tudo nas minhas" on public.recorrencias
   for all to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+
+-- ---------- Permissões ----------
+-- Projetos novos do Supabase não dão acesso automático às tabelas para quem está logado.
+-- O RLS acima continua decidindo quais linhas cada um vê; isso só libera o acesso à tabela.
+grant usage on schema public to authenticated;
+grant select, insert, update, delete on
+  public.categorias, public.lancamentos, public.cartoes, public.faturas_pagas, public.recorrencias
+  to authenticated;
